@@ -4,6 +4,14 @@ function sigmoid(x, beta)
     return 1.0 / (1.0 + exp(-beta * (x - 1)))
 end
 
+function Enullcline(rE, theta_E, w_EE, w_IE, beta)
+    return (theta_E + w_EE * rE - 1 + (1 / beta) * log((-rE + 1) / rE)) / w_IE
+end
+
+function Inullcline(rE, theta_I, w_EI, beta)
+    return 1 / (1 + exp(-beta * theta_I - beta * w_EI * rE + beta))
+end
+
 function simulate(tau_E, tau_I, theta_E, theta_I, w_EE, w_EI, w_IE, beta, range_t, dt)
     # Initial conditions
     Lt = length(range_t)
@@ -25,7 +33,7 @@ function main()
     # Parameters (time in s)
     tau_E = 0.0032
     tau_I = 0.0032
-    theta_E = 0.4
+    theta_E = 0.71
     theta_I = 0.0
     w_EE = 2.4
     w_EI = 2.0
@@ -44,12 +52,27 @@ function main()
 
 
     # Simulate the model
-    rE, rI = simulate(tau_E, tau_I, theta_E, theta_I, w_EE, w_EI, w_IE, beta, range_t, dt)
+    #rE, rI = simulate(tau_E, tau_I, theta_E, theta_I, w_EE, w_EI, w_IE, beta, range_t, dt)
 
     # Plot the results
-    x = range_t
-    plot(x, [rE, rI], label=["E" "I"], xlabel="Time", ylabel="Activity")
+    #x = range_t
+    #plot(x, [rE, rI], label=["E" "I"], xlabel="Time", ylabel="Activity")
+    #savefig("myplot.png")
+
+    range_E = 0.0:0.01:1
+    E_nullclines = zeros(length(range_E))
+    I_nullclines = zeros(length(range_E))
+    Le = length(range_E)
+    for i in 1:Le
+        E_nullclines[i] = Enullcline(range_E[i], theta_E, w_EE, w_IE, beta)
+        I_nullclines[i] = Inullcline(range_E[i], theta_I, w_EI, beta)
+    end
+
+    # Plot the results
+    x = range_E
+    plot(x, [E_nullclines, I_nullclines], label=["Enullcline" "Inullcline"], xlabel="E", ylabel="I")
     savefig("myplot.png")
+
 end
 
 main()
