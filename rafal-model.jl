@@ -1,9 +1,10 @@
 using NeuralDynamics, Plots
 
-function oscill_time_input(A, f, base, range_t)
+function oscill_time_input(A, f, base, phase, range_t)
+    Lt = length(range_t)
     R = zeros(length(range_t))
-    for i in 1:length(range_t)
-        R[i] = A * sin((f / (2 * pi)) * range_t[i] * 4) + base
+    for i in 1:Lt
+        R[i] = A * sin(f * 2 * pi * range_t[i] + phase) + base
     end
     return R
 end
@@ -40,24 +41,26 @@ function max_min_after(R, Lt, start_t=0.1)
     return max, min
 end
 
-function plot_max_min(tau_E, tau_I, theta_I, w_EE, w_EI, w_IE, beta, range_t, dt, range_theta_E)
+function plot_max_min(tau_E, tau_I, w_EE, w_EI, w_IE, beta, range_t, dt, range_theta_input, theta_const, input_pop)
     Lt = length(range_t)
-    Lte = length(range_theta_E)
+    Lte = length(range_theta_input)
     rE_max = zeros(Lte)
     rE_min = zeros(Lte)
 
     window = [0.05, 0.1]
 
     for i in 1:Lte
-        theta_E = fill(range_theta_E[i], Lt)
+        theta_E = input_pop == "E" ? fill(range_theta_input[i], Lt) : fill(theta_const, Lt)
+        theta_I = input_pop == "I" ? fill(range_theta_input[i], Lt) : fill(theta_const, Lt)
+
         rE, _ = simulate(tau_E, tau_I, theta_E, theta_I, w_EE, w_EI, w_IE, beta, range_t, dt)
         rE_max[i], _ = findmax(rE[trunc(Int, window[1] / dt):trunc(Int, window[2] / dt)])
         rE_min[i], _ = findmin(rE[trunc(Int, window[1] / dt):trunc(Int, window[2] / dt)])
     end
     
     # Plot the results
-    x = range_theta_E
-    plot(x, [rE_max, rE_min], label=["Emax" "Emin"], xlabel="theta_E", ylabel="E amplitude")
+    x = range_theta_input
+    plot(x, [rE_max, rE_min], label=["max" "min"], xlabel="theta_"*input_pop, ylabel="E amplitude")
     savefig("myplot.png")
 end
 
@@ -69,14 +72,14 @@ function plot_act_time(tau_E, tau_I, theta_E, theta_I, w_EE, w_EI, w_IE, beta, r
     savefig("myplot.png")
 end
 
-function plot_act_oscill_time(tau_E, tau_I, theta_I, w_EE, w_EI, w_IE, beta, range_t, dt, A, f, base)
-    Lt = length(range_t)
-    theta_E = oscill_time_input(A, f, base, range_t)
+function plot_act_oscill_time(tau_E, tau_I, w_EE, w_EI, w_IE, beta, range_t, dt, E_A, E_f, E_base, E_phase, I_A, I_f, I_base, I_phase)
+    theta_E = oscill_time_input(E_A, E_f, E_base, E_phase, range_t)
+    theta_I = oscill_time_input(I_A, I_f, I_base, I_phase, range_t)
     rE, rI = simulate(tau_E, tau_I, theta_E, theta_I, w_EE, w_EI, w_IE, beta, range_t, dt)
 
     # Plot the results
-    p1 = plot(range_t, theta_E, xlabel="t", ylabel="Input")
-    p2 = plot(range_t, [rE, rI], xlabel="t", ylabel="Activity")
+    p1 = plot(range_t, [theta_E, theta_I], label=["E", "I"], xlabel="t", ylabel="Input")
+    p2 = plot(range_t, [rE, rI], label=["E", "I"], xlabel="t", ylabel="Activity")
     plot(p1, p2, layout=(2,1))
     savefig("myplot.png")
 end
@@ -111,18 +114,24 @@ function main()
     dt = 0.001
 
     range_t = 0.0:dt:T
-    range_theta_E = 0.0:0.001:2.0
 
-    theta_E = fill(1.4, length(range_t))
-    theta_I = fill(0.0, length(range_t))
-
+    #theta_E = fill(1.3, length(range_t))
+    #theta_I = fill(0.75, length(range_t))
     #plot_act_time(tau_E, tau_I, theta_E, theta_I, w_EE, w_EI, w_IE, beta, range_t, dt)
-    #plot_max_min(tau_E, tau_I, theta_I, w_EE, w_EI, w_IE, beta, range_t, dt, range_theta_E)
 
-    A = 0.1
-    f = 55
-    base = 0.6
-    plot_act_oscill_time(tau_E, tau_I, theta_I, w_EE, w_EI, w_IE, beta, range_t, dt, A, f, base)
+    #range_theta = 0.0:0.001:2.0
+    #const_theta = 1.3
+    #plot_max_min(tau_E, tau_I, w_EE, w_EI, w_IE, beta, range_t, dt, range_theta, const_theta, "I")
+
+    E_A = 0.5
+    E_f = 4
+    E_base = 0.5
+    E_phase = 0.0
+    I_A = 0.5
+    I_f = 4
+    I_base = 0.5
+    I_phase = 0.2 / dt
+    plot_act_oscill_time(tau_E, tau_I, w_EE, w_EI, w_IE, beta, range_t, dt, E_A, E_f, E_base, E_phase, I_A, I_f, I_base, I_phase)
 
 end
 
