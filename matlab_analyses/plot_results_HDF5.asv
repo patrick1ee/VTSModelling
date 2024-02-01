@@ -1,0 +1,305 @@
+function [] = plot_results_HDF5(Paths, Const)
+
+%% Clear the workspace
+close all
+
+%% ================================
+SR = 1000; % recording sampling rate in Hz, do not change this
+
+data_path = Paths.data;
+
+FLT_BAND = Const.FLT_BAND; % Hz
+EEG_chan = Const.EEG_chan; 
+REF_CHAN = Const.REF_CHAN;  
+
+%% OSCILLTRACK GAMMA VALUE COMPARISON DATA in 'C:\ANT_Realtime_Acquisition\EEGVIBE_dev_version\out_data\'
+% EC = Eyes closed
+% dataLabels = {'EC g=0.01', 'EC gamma=0.05', 'EC g=0.1', 'EC g=0.15', 'EC g=0.25', 'Eyes Open'};
+% fileNames = { '28_06_2023_P22_Ch28_FRQ=9Hz_FULL_CL_phase=90_Petra_dev_EC_gamma0comma01_v1', ...
+%              '28_06_2023_P22_Ch28_FRQ=9Hz_FULL_CL_phase=90_Petra_dev_EC_gamma0comma05_v1', ...
+%              '28_06_2023_P22_Ch28_FRQ=9Hz_FULL_CL_phase=90_Petra_test_EC_gamma0comma1_v1', ...
+%              '28_06_2023_P22_Ch28_FRQ=9Hz_FULL_CL_phase=90_Petra_dev_EC_gamma0comma15_v2', ...
+%              '28_06_2023_P22_Ch28_FRQ=9Hz_FULL_CL_phase=90_Petra_dev_EC_gamma0comma25_v1'};
+
+dataLabels = Const.dataLabels;
+
+fileNames = Const.fileNames;
+
+STIM_TRAIN_ITI = 0.5; % seconds
+
+% Select part of the data, you may want to discard some data at the start
+% or end
+WIN_START = 5; %sec
+WIN_END   = 57; %sec
+
+
+%% ================================
+% SOME KEY PARAMETERS THAT CAN BE TWEAKED
+ALIGN_TO_TROUGH = false; % true or false; If false, then align to the real stimulation points
+
+SELECT_STIM_POINT = 0;  % which of the stimulation pulses to choose for the ERP
+
+
+% Define the size of the time-window for 
+% computing the ERP (event-related potential)
+ERP_tWidth = 1; % [sec]
+ERP_tOffset = ERP_tWidth / 2;  % [sec]
+ERP_LOWPASS_FILTER = 30; % set to nan if you want to deactivate it
+
+% FLT_DIRECTION = 'onepass'; % 'onepass' or 'twopass'; onepass is used during the recording
+FLT_DIRECTION = 'twopass'; % 'onepass' or 'twopass'; onepass is used during the recording
+
+% Select the frequencies you want to show for the power spectrum
+POW_SPECTRUM_FREQS = 3:55; % in Hz
+
+% Define the colours for the plots
+Const.blueCol    = [14, 120, 158] / 255;
+Const.darkRedCol = [169, 41, 72] / 255;
+Const.yellow = [0.8, 0.8, 0];
+Const.black  = [0.3, 0.3, 0.3];
+cols = [Const.blueCol; Const.darkRedCol; Const.yellow; Const.black; [1, 0, 0]; [0, 1, 0]];
+
+
+%% ==========================================
+% Do not change these parameters
+FLT_ORDER = 2;
+
+%% ==========================================
+fig_h     = figure;
+supertitle(strrep(fileNames{1}, '_', ' '))
+
+
+%% Prepare the data before creating individual subplots
+raw_data_multi = [];
+flt_data_multi = [];
+flt_data_noReref_multi = [];
+
+for fn = 1:numel(fileNames)
+    currFileName = fileNames{fn};
+    data = h5read([data_path, currFileName, '.hdf5'], '/EEG');
+    EEG_noReRef  =  data(EEG_chan,:)';
+    
+    % C3 = 15, POz = 29, Pz = 31
+    % 9 = FC5, 10 = FC1, 20 = CP5, 21 = CP1    
+    ref_chans_avg = mean([data(REF_CHAN,:)], 1)';
+
+    if Const.RE_REF_ON
+        EEG = EEG_noReRef - ref_chans_avg;
+    else
+        EEG = EEG_noReRef;        
+    end
+    EEG(1) = EEG(2); % replace the first 0 with the second value
+    EEG_noReRef(1) = EEG_noReRef(2);
+    
+%     figure;
+%     plot(EEG)
+    
+    %% Read the EEG data
+    if ~isnan(WIN_END)
+        EEG_preSubtract = EEG(WIN_START * SR: WIN_END*SR); % Cut the data to a chosen window 
+        EEG_noReRef_preSubtract = EEG_noReRef(WIN_START * SR: WIN_END*SR); % Cut the data to a chosen window 
+    elseif isnan(WIN_END)
+        EEG_preSubtract = EEG(WIN_START * SR: end); % Cut the data to a chosen window 
+        EEG_noReRef_preSubtract = EEG_noReRef(WIN_START * SR: end); % Cut the data to a chosen window 
+    end
+    movingMean = movmean(EEG_preSubtract, SR*1);       % Calculate a moving average in a 1s long window...
+    EEG_data = EEG_preSubtract - movingMean;          % ... and subtract it
+
+    movingMean2 = movmean(EEG_noReRef_preSubtract, SR*1);       % Calculate a moving average in a 1s long window...
+    EEG_noReRef_data = EEG_noReRef_preSubtract - movingMean2;          % ... and subtract it
+
+    
+    % Automatically remove artefacts occurring as sharp peaks by computing
+    % a robust z-scores (based on the median and the median absolute
+    % devition) and replacing and interpolating all values that fall beyond
+    % 4
+    med_abs_dev = 1.4826 * median(abs(EEG_data - median(EEG_data, 'omitnan')), 'omitnan');  %  the constant 1.4826 assumes normality of the data
+    med_abs_dev_scores = (EEG_data - median(EEG_data, 'omitnan')) / med_abs_dev;    
+    OUTL_THRESHOLD = 5;
+    fprintf('%i samples removed as outlier.\n', sum(abs(med_abs_dev_scores > OUTL_THRESHOLD)));
+    
+%     figure; 
+%     plot(EEG_data); hold on
+%     plot(find(abs(med_abs_dev_scores) > OUTL_THRESHOLD), EEG_data(abs(med_abs_dev_scores) > OUTL_THRESHOLD), 'x', 'Color', 'r')
+    data_outlierRem = EEG_data;
+    data_outlierRem(abs(med_abs_dev_scores) > OUTL_THRESHOLD) = nan;
+    data_outlierRem = inpaint_nans(data_outlierRem);
+
+    EEG_noReRef_data(abs(med_abs_dev_scores) > OUTL_THRESHOLD) = nan;
+    EEG_noReRef_data = inpaint_nans(EEG_noReRef_data);
+    
+
+
+    %% Filter the data
+    FLT_DIRECTION  ='twopass';
+    [data_flt] =  butterworth_filter(data_outlierRem,  FLT_BAND, FLT_ORDER, FLT_DIRECTION, SR);
+    [data_noReRef_flt] = butterworth_filter(EEG_noReRef_data,  FLT_BAND, FLT_ORDER, FLT_DIRECTION, SR);
+    
+    raw_data_multi(fn,:)  = data_outlierRem;
+    flt_data_multi(fn,:)  = data_flt;
+    flt_data_noReref_multi(fn,:) = data_noReRef_flt;
+    
+    %% Read the stimulation points and process them so they 
+    % align with the selected EEG window 
+    [stimPts, stimPts_affDelay] = get_stim_pts(data, WIN_START, WIN_END, SR);
+    stimPts_multi.(['Rec', num2str(fn)]) = stimPts_affDelay;  % store the points for plotting
+
+    alpha_phase   = angle(hilbert(data_flt));                
+    stimPt_phase.(['Rec', num2str(fn)])  = alpha_phase(round(stimPts*SR));
+    
+    % Detect zero-crossings, could also use hilbert(angle) to detect them
+    % DET=2: Falling slope, 
+    % DET=-2: Rising slope, not used any further here
+    peaks.(['Rec', num2str(fn)])   = find(diff(sign(diff(data_flt))) == -2);
+    troughs.(['Rec', num2str(fn)]) = find(diff(sign(diff(data_flt))) == 2);
+    decrZeroXing.(['Rec', num2str(fn)]) = find(diff(data_flt > 0) == -1);
+    incrZeroXing.(['Rec', num2str(fn)]) = find(diff(data_flt > 0) == 1);
+end
+
+
+%% Calculate and plot the stimulation-evoked potential on 1 Hz high-pass, 
+% and 30 Hz low-pass filtered
+dtTime = 1/SR;
+
+subplot(3,2,1)
+for fn = 1:numel(fileNames) 
+    stimPts   = stimPts_multi.(['Rec', num2str(fn)]);
+    stimOnset = round(stimPts*SR);
+    
+    if SELECT_STIM_POINT > 0  % Only if a number larger than 0 was specified for SELECT_STIM_POINT
+        stimItvls = diff(stimPts); % compute the difference between consecutive intervals
+        tagFirstStim = stimItvls > STIM_TRAIN_ITI;
+        firstStims = [false, tagFirstStim]; % we need to add one element at the start, to account for the fact we lost one element when using diff()
+        idcsStimPts = find(firstStims) + SELECT_STIM_POINT - 1 ; % we need to subtract 1, because SELECT_STIM_POINT starts at 1, and find(firstStims) already gives us the first 
+        idcsStimPts(idcsStimPts > numel(stimPts)) = []; % this prevents an error if you would try to look for points beyond the total number of points recorded
+        
+        stimOnset = round(stimPts(idcsStimPts)*SR);
+    end
+    
+    %% Select a condition for the stimOnset
+    if ALIGN_TO_TROUGH
+        stimOnset = troughs.(['Rec', num2str(fn)]); 
+    end
+   
+    % Remove events that are too close to the data border
+    events_sec = stimOnset/SR; % convert events to seconds
+    dataLen_sec = size(raw_data_multi,2)/SR;  % calc. data length in seconds
+    events_sec(events_sec > dataLen_sec-(ERP_tWidth-ERP_tOffset)) = nan;
+    events_sec(events_sec < ERP_tOffset) = nan;
+    
+    EEG_data = raw_data_multi(fn,:); % unfiltered data
+
+    if ~isnan(ERP_LOWPASS_FILTER)
+        [b,a]  = butter(FLT_ORDER, ERP_LOWPASS_FILTER/(SR/2), 'low');
+        EEG_data = filtfilt(b, a, EEG_data);
+    end
+
+    %% Activate if you want to calculate ERP on the alpha-filter
+    EEG_data = flt_data_multi(fn,:);
+
+    events_sec = events_sec(~isnan(events_sec));
+    if ~isempty(events_sec)
+        events_sec(1) = [];
+    end
+    trialsMatrix = getTrialsMatrix(events_sec, EEG_data, dtTime, ERP_tWidth, ERP_tOffset);
+
+    plot(median(trialsMatrix,2), 'LineWidth', 2, 'Color', cols(fn,:)); hold on
+    xTicks = [ 250, 500, 750]; % here you define the position of the x-ticks
+    set(gca, 'XTick', xTicks)
+    set(gca, 'XTickLabel', ((xTicks/SR*1000 - ERP_tOffset*1000)))
+%     xlim([1, size(trialsMatrix,1)])
+    xlabel('Time [ms]')
+    title('Event-related potential')
+end
+yLims = get(gca, 'YLim');
+plot(ERP_tOffset*SR * [1 1], yLims, '--', 'Color', 'k', 'LineWidth', 2)
+
+
+%% Calculate and plot the power spectra
+winLength = SR;  
+win = hamming(winLength);
+overlap = 0.5; % with 50 percent overlap    
+subplot(3,2,2)
+
+for fn = 1:numel(fileNames) 
+    % Details on the pwelch function: https://edoras.sdsu.edu/doc/matlab/toolbox/signal/pwelch.html
+    powSpect = pwelch(raw_data_multi(fn,:)',  win, winLength * overlap, POW_SPECTRUM_FREQS, SR, 'psd');    
+    h(fn) = plot(powSpect, 'LineWidth', 2, 'Color', cols(fn,:)); hold on
+%     h(fn) = plot(smooth(powSpect, 5), 'LineWidth', 2, 'Color', cols(fn,:)); hold on
+    xTicks = 1:5:numel(POW_SPECTRUM_FREQS);
+    set(gca, 'XTick', xTicks);
+    freqCenter = POW_SPECTRUM_FREQS(xTicks);
+    xlim([1, numel(powSpect)])
+    set(gca, 'XTickLabel', freqCenter);            
+    [~, findFreq] = min(abs(POW_SPECTRUM_FREQS - mean(FLT_BAND)));
+    yLims = get(gca, 'YLim');
+    plot(findFreq*[1,1], yLims, '--', 'Color', 'k', 'LineWidth', 2)
+%     set(gca, 'YLim', yLims)
+    title('Power spectrum')
+    xlabel('Frequencies [Hz]')
+end
+legend(h, strrep(dataLabels, '_', ' '))
+
+
+
+%% Plot RAW DATA (check for big artefacts)
+figure
+for fn = 1:numel(fileNames) 
+    subplot(3,2,fn)
+    plot(raw_data_multi(fn,:), 'Color', cols(fn,:)); hold on
+    stimPts = stimPts_multi.(['Rec', num2str(fn)]);
+    stimOnset = round(stimPts*SR);
+    plot(stimOnset, flt_data_multi(fn, stimOnset), 'x', 'Color','k')
+    title(['Raw data ', dataLabels{fn}])
+    xlim([1, size(raw_data_multi,2)])
+    xTicks = get(gca, 'XTick');
+    set(gca, 'XTick', xTicks)
+    set(gca, 'XTickLabel', xTicks/SR)
+    xlabel('Time [s]')
+end
+
+
+%% Plot FILTERED DATA and stim points
+figure
+for fn = 1:numel(fileNames) 
+    subplot(3,2,fn)
+%     plot(flt_data_noReref_multi(fn,:), 'Color', 0.5*[1 1 1]); hold on
+    plot(flt_data_multi(fn,:), 'Color', cols(fn,:)); hold on
+
+    stimPts = stimPts_multi.(['Rec', num2str(fn)]);
+    stimOnset = round(stimPts*SR);
+    plot(stimOnset, flt_data_multi(fn,stimOnset), 'x', 'Color','k')
+    title(['Filtered data ', dataLabels{fn}])
+    xlim([1, size(raw_data_multi,2)])
+    xTicks = get(gca, 'XTick');
+    set(gca, 'XTick', xTicks)
+    set(gca, 'XTickLabel', xTicks/SR)
+    xlabel('Time [s]')
+end
+
+%% Plot arrows for accuracy
+figure
+darkBlue  = [0,10,160] / 255;
+
+for fn = 1:numel(fileNames) 
+    subplot(3,2,fn)
+%     plot(flt_data_noReref_multi(fn,:), 'Color', 0.5*[1 1 1]); hold on
+    phases = stimPt_phase.(['Rec', num2str(fn)]);
+    radii = ones(size(phases));
+    [u1,v1] = pol2cart(phases,radii); 
+    a = compass(u1,v1); hold on
+    set(gca, 'XLim', [-1 1])
+    transparency = 0.1;
+    set(a, 'LineWidth', 1.2, 'Color', [darkBlue, transparency]);   
+    meanCart_compass(1) = mean(u1);
+    meanCart_compass(2) = mean(v1);
+    h = compass(meanCart_compass(1), meanCart_compass(2));
+
+    [theta] = cart2pol(meanCart_compass(1), meanCart_compass(2)); 
+    mean_phase = rad2deg(theta);
+    % save([Paths.matfiles, 'phase_', fileNames{fn}, '.mat'], 'mean_phase')
+
+%     tweakCompass(gcf, 14)
+    title(dataLabels{fn})
+    set(h, 'LineWidth', 2, 'Color', 'k');
+end
