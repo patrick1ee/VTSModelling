@@ -61,7 +61,7 @@ function plot_max_min(tau_E, tau_I, w_EE, w_EI, w_IE, beta, range_t, dt, range_t
     # Plot the results
     x = range_theta_input
     plot(x, [rE_max, rE_min], label=["max" "min"], xlabel="theta_"*input_pop, ylabel="E amplitude")
-    savefig("myplot.png")
+    savefig("plots/myplot.png")
 end
 
 function plot_act_time(tau_E, tau_I, theta_E, theta_I, w_EE, w_EI, w_IE, beta, range_t, dt)
@@ -69,7 +69,7 @@ function plot_act_time(tau_E, tau_I, theta_E, theta_I, w_EE, w_EI, w_IE, beta, r
 
     # Plot the results
     plot(range_t, [rE, rI], label=["E" "I"], xlabel="t", ylabel="Activity")
-    savefig("myplot.png")
+    savefig("plots/myplot.png")
 end
 
 function plot_act_oscill_time(tau_E, tau_I, w_EE, w_EI, w_IE, beta, range_t, dt, E_A, E_f, E_base, E_phase, I_A, I_f, I_base, I_phase)
@@ -78,10 +78,10 @@ function plot_act_oscill_time(tau_E, tau_I, w_EE, w_EI, w_IE, beta, range_t, dt,
     rE, rI = simulate(tau_E, tau_I, theta_E, theta_I, w_EE, w_EI, w_IE, beta, range_t, dt)
 
     # Plot the results
-    p1 = plot(range_t, [theta_E, theta_I], label=["E", "I"], xlabel="t", ylabel="Input")
-    p2 = plot(range_t, [rE, rI], label=["E", "I"], xlabel="t", ylabel="Activity")
+    p1 = plot(range_t, [theta_E, theta_I], xlabel="t", ylabel="Input")
+    p2 = plot(range_t, [rE, rI], xlabel="t", ylabel="Activity")
     plot(p1, p2, layout=(2,1))
-    savefig("myplot.png")
+    savefig("plots/myplot.png")
 end
 
 
@@ -123,14 +123,14 @@ function main()
     #const_theta = 1.3
     #plot_max_min(tau_E, tau_I, w_EE, w_EI, w_IE, beta, range_t, dt, range_theta, const_theta, "I")
 
-    E_A = 0.5
+    E_A = 0.45
     E_f = 4
-    E_base = 0.5
+    E_base = 0.45
     E_phase = 0.0
     I_A = 0.5
     I_f = 4
     I_base = 0.5
-    I_phase = 0.2 / dt
+    I_phase = -(pi / 3)
     plot_act_oscill_time(tau_E, tau_I, w_EE, w_EI, w_IE, beta, range_t, dt, E_A, E_f, E_base, E_phase, I_A, I_f, I_base, I_phase)
 
 end
