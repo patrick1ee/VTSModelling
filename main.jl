@@ -1,7 +1,7 @@
 include("./BenoitModel.jl")
 include("./RafalModel.jl")
 
-using CSV, DataFrames, NeuralDynamics, Plots
+using CSV, DataFrames, FFTW, NeuralDynamics, Plots, Statistics
 using .RafalModel: create_rafal_model, simulate_rafal_model
 using .BenoitModel: create_benoit_model, simulate_benoit_model
 
@@ -19,10 +19,15 @@ function plot_act_time(df)
     savefig("plots/myplot.png")
 end
 
-function plot_oscill_time(df)
+function plot_oscill_time(df, sampling_rate)
+    freqs = fftshift(fftfreq(length(df.t), sampling_rate))
+    F_E = fftshift(fft(df.rE .- mean(df.rE)))
+    F_I = fftshift(fft(df.rI .- mean(df.rI)))
+
     p1 = plot(df.t, [df.theta_E, df.theta_I], xlabel="t", ylabel="Input")
     p2 = plot(df.t, [df.rE, df.rI], xlabel="t", ylabel="Activity")
-    plot(p1, p2, layout=(2,1))
+    p3 = plot(freqs, [abs.(F_E), abs.(F_I)], xlabel="f", xlim=(0, +100), xticks=0:20:100) 
+    plot(p1, p2, p3, layout=(3,1))
     savefig("plots/myplot.png")
 end
 
@@ -30,7 +35,6 @@ function plot_max_min(df)
     plot(df.theta, [df.rE_max, df.rE_min], label=["max" "min"], xlabel="theta_I"*df.input_pop[1], ylabel="E amplitude")
     savefig("plots/myplot.png")
 end
-
 
 function run_max_min(m, simulate, range_t, dt, range_theta_input, theta_const, input_pop)
     Lt = length(range_t)
@@ -81,18 +85,19 @@ function main()
     T = 1.0
     dt = 0.001
     range_t = 0.0:dt:T
+    sampling_rate = T / dt
 
-    E_A = 0.45
+    E_A = 0.1
     E_f = 4
-    E_base = 0.45
+    E_base = 0.6
     E_phase = 0.0
-    I_A = 0.5
+    I_A = 0.0
     I_f = 4
-    I_base = 0.5
+    I_base = 0.0
     I_phase = -(pi / 3)
     
     df = run_act_oscill_time(model, simulate_benoit_model, range_t, dt, E_A, E_f, E_base, E_phase, I_A, I_f, I_base, I_phase)
-    plot_oscill_time(df)
+    plot_oscill_time(df, sampling_rate)
 
 end
 
