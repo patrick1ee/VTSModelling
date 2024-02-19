@@ -9,7 +9,7 @@ addpath(genpath('.')) % Add all subfolders in the current folder to the Matlab p
 %% Define the paths that contain the recorded data and will be used 
 %  to store plots and matfiles
 Paths.data     = 'data\';
-Paths.data     = 'F:\Experiments\3rd_Yr_Projects\CL_stim\data\';
+%Paths.data     = 'F:\Experiments\3rd_Yr_Projects\CL_stim\data\';
 Paths.plots    = 'plots\'; % specify the path relative to the folder where the code is
 Paths.matfiles = 'matfiles\'; % specify the path relative to the folder where the code is
 

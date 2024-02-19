@@ -1,9 +1,11 @@
 include("./BenoitModel.jl")
+include("./ByrneModel.jl")
 include("./RafalModel.jl")
 
 using CSV, DataFrames, FFTW, NeuralDynamics, Plots, Statistics
 using .RafalModel: create_rafal_model, simulate_rafal_model
 using .BenoitModel: create_benoit_model, simulate_benoit_model
+using .ByrneModel: create_byrne_pop, simulate_byrne_pop
 
 function create_oscill_input(A, f, base, phase, range_t)
     Lt = length(range_t)
@@ -33,6 +35,14 @@ end
 
 function plot_max_min(df)
     plot(df.theta, [df.rE_max, df.rE_min], label=["max" "min"], xlabel="theta_I"*df.input_pop[1], ylabel="E amplitude")
+    savefig("plots/myplot.png")
+end
+
+function plot_byrne_single(df)
+    p1 = plot(df.t, df.rR, xlabel="t", ylabel="R")
+    p2 = plot(df.t, df.rV, xlabel="t", ylabel="V")
+    p3 = plot(df.t, df.rZ, xlabel="t", ylabel="|Z|")
+    plot(p1, p2, p3, layout=(3,1))
     savefig("plots/myplot.png")
 end
 
@@ -71,7 +81,12 @@ function run_act_oscill_time(m, simulate, range_t, dt, E_A, E_f, E_base, E_phase
     return DataFrame(t=range_t, rE=rE, rI=rI, theta_E=theta_E, theta_I=theta_I)
 end
 
-function main()
+function run_byrne_single(p, simulate, range_t, dt)
+    rR, rV, rZ = simulate(p, range_t, dt)
+    return DataFrame(t=range_t, rR=rR, rV=rV, rZ=rZ)
+end
+
+function main_raf()
     # Parameters (time in s)
     tau_E = Float32(0.0032)
     tau_I = Float32(0.0032)
@@ -101,5 +116,25 @@ function main()
 
 end
 
-main()
+function main_byrne()
+    # Parameters (time in ms)
+    ex = Float32(2.0)
+    ks = Float32(1.0)
+    kv = Float32(1.0)
+    gamma = Float32(0.5)
+    tau = Float32(16.0)
+    alpha = Float32(0.5)
+
+    p = create_byrne_pop(ex, ks, kv, gamma, tau, alpha)
+    
+    T = 1000.0
+    dt = 0.001
+    range_t = 0.0:dt:T
+    
+    df = run_byrne_single(p, simulate_byrne_pop, range_t, dt)
+    plot_byrne_single(df)
+
+end
+
+main_byrne()
 

@@ -2,7 +2,7 @@ module ByrneModel
 
     using DiffEqNoiseProcess, JSON, Plots
 
-    export ByrneModel, create_byrne_model, simulate_byrne_model
+    export ByrneModel, create_byrne_pop, simulate_byrne_pop
 
     struct Population
         ex::Float32
@@ -10,6 +10,7 @@ module ByrneModel
         kv::Float32
         gamma::Float32 # Hetereogeneity parameter
         tau::Float32
+        alpha::Float32
     end
 
     struct Network
@@ -25,108 +26,40 @@ module ByrneModel
     end
     
 
-    function create_marco_model(tau_E::Float32, tau_I::Float32, w_EE::Float32, w_EI::Float32, w_IE::Float32, beta::Float32)
-        WE = WienerProcess(0.0, 1.0, 1.0)
-        WI = WienerProcess(0.0, 1.0, 1.0)
-        return Network(tau_E, tau_I, w_EE, w_EI, w_IE, beta, WE, WI)
+    function create_byrne_pop(ex::Float32, ks::Float32, kv::Float32, gamma::Float32, tau::Float32, alpha::Float32)
+        return Population(ex, ks, kv, gamma, tau, alpha)
     end
 
-    function sigmoid(x, beta)
-        return 1.0 / (1.0 + exp(-beta * (x - 1)))
+    function get_kuramoto_parameter(r, v, tau)
+        w = pi * tau * r - v*im
+        return (1 - w) / (1 + w)
     end
 
-    function simulate_marco_model(n::Network, range_t, dt, theta_E, theta_I)
+    function get_synaptic_activity(p::Population, t)
+        return p.alpha^2 * t * exp(-p.alpha * t)
+    end
+
+    function simulate_byrne_pop(p::Population, range_t, dt)
         # Initial conditions
         Lt = length(range_t)
-        rE = zeros(Lt)
-        rI = zeros(Lt)
+        rR = zeros(Lt)
+        rV = zeros(Lt)
+        rZ = zeros(Lt)
 
-        rWE = zeros(Lt)
-        rWI = zeros(Lt)
-        n.WE.dt = dt
-        n.WI.dt = dt
-        uWE = nothing;
-        pWE = nothing; # for state-dependent distributions
-        uWI = nothing;
-        pWI = nothing;
-        calculate_step!(n.WE, dt, uWE, pWE)
-        calculate_step!(n.WI, dt, uWI, pWI)
-        module marcoModel
-
-        using DiffEqNoiseProcess, JSON, Plots
-    
-        export MarcoModel, create_marco_model, simulate_marco_model
-    
-        struct Network
-            tau_E::Float32
-            tau_I::Float32
-            w_EE::Float32
-            w_EI::Float32
-            w_IE::Float32
-            beta::Float32
-            WE
-            WI
-        end
-        
-    
-        function create_marco_model(tau_E::Float32, tau_I::Float32, w_EE::Float32, w_EI::Float32, w_IE::Float32, beta::Float32)
-            WE = WienerProcess(0.0, 1.0, 1.0)
-            WI = WienerProcess(0.0, 1.0, 1.0)
-            return Network(tau_E, tau_I, w_EE, w_EI, w_IE, beta, WE, WI)
-        end
-    
-        function sigmoid(x, beta)
-            return 1.0 / (1.0 + exp(-beta * (x - 1)))
-        end
-    
-        function simulate_marco_model(n::Network, range_t, dt, theta_E, theta_I)
-            # Initial conditions
-            Lt = length(range_t)
-            rE = zeros(Lt)
-            rI = zeros(Lt)
-    
-            rWE = zeros(Lt)
-            rWI = zeros(Lt)
-            n.WE.dt = dt
-            n.WI.dt = dt
-            uWE = nothing;
-            pWE = nothing; # for state-dependent distributions
-            uWI = nothing;
-            pWI = nothing;
-            calculate_step!(n.WE, dt, uWE, pWE)
-            calculate_step!(n.WI, dt, uWI, pWI)
-    
-            # Simulate the model
-            for i in 2:Lt
-                drE = (dt / n.tau_E) * (-rE[i-1] + sigmoid(theta_E[i-1] + n.w_EE * rE[i-1] - n.w_IE * rI[i-1], n.beta))
-                drI = (dt / n.tau_I) * (-rI[i-1] + sigmoid(theta_I[i-1] + n.w_EI * rE[i-1], n.beta))
-    
-                accept_step!(n.WE, dt, uWE, pWE)
-                accept_step!(n.WI, dt, uWI, pWI)
-    
-                rWE[i] = n.WE[i]
-                rWI[i] = n.WI[i]
-      
-                rE[i] = rE[i-1] + drE + n.WE[i] - n.WE[i - 1]
-                rI[i] = rI[i-1] + drI + n.WI[i] - n.WI[i - 1]
-            end
-            return rE, rI
-        end
-    end
         # Simulate the model
         for i in 2:Lt
-            drE = (dt / n.tau_E) * (-rE[i-1] + sigmoid(theta_E[i-1] + n.w_EE * rE[i-1] - n.w_IE * rI[i-1], n.beta))
-            drI = (dt / n.tau_I) * (-rI[i-1] + sigmoid(theta_I[i-1] + n.w_EI * rE[i-1], n.beta))
+            drR = (dt / p.tau) * (-p.kv * rR[i-1] + 2 * rR[i-1] * rV[i-1] + p.gamma / (pi * p.tau))
 
-            accept_step!(n.WE, dt, uWE, pWE)
-            accept_step!(n.WI, dt, uWI, pWI)
+            U = get_synaptic_activity(p, range_t[i-1])
+            drV = (dt / p.tau) * (p.ex + rV[i-1]^2 - pi^2 * p.tau^2 * rR[i-1]^2 + p.ks * U)
 
-            rWE[i] = n.WE[i]
-            rWI[i] = n.WI[i]
-  
-            rE[i] = rE[i-1] + drE + n.WE[i] - n.WE[i - 1]
-            rI[i] = rI[i-1] + drI + n.WI[i] - n.WI[i - 1]
+            rR[i] = rR[i-1] + drR
+            rV[i] = rV[i-1] + drV
+            rZ[i] = abs(get_kuramoto_parameter(rR[i], rV[i], p.tau))
+
         end
-        return rE, rI
+        return rR, rV, rZ
     end
+
+
 end
