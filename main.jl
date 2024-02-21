@@ -76,7 +76,10 @@ end
 function run_act_oscill_time(m, simulate, range_t, dt, E_A, E_f, E_base, E_phase, I_A, I_f, I_base, I_phase)
     theta_E = create_oscill_input(E_A, E_f, E_base, E_phase, range_t)
     theta_I = create_oscill_input(I_A, I_f, I_base, I_phase, range_t)
-    rE, rI = simulate(m, range_t, dt, theta_E, theta_I)
+    R = simulate(m, range_t, dt, theta_E, theta_I)
+
+    rE = R[1].rE
+    rI = R[1].rI
 
     return DataFrame(t=range_t, rE=rE, rI=rI, theta_E=theta_E, theta_I=theta_I)
 end
@@ -88,6 +91,8 @@ end
 
 function main_raf()
     # Parameters (time in s)
+    N=1
+    W=Float32[0.0]
     tau_E = Float32(0.0032)
     tau_I = Float32(0.0032)
     w_EE = Float32(2.4)
@@ -95,23 +100,23 @@ function main_raf()
     w_IE = Float32(2.0)
     beta = Float32(4.0)
 
-    model = create_benoit_model(tau_E, tau_I, w_EE, w_EI, w_IE, beta)
+    model = create_rafal_model(N, W, tau_E, tau_I, w_EE, w_EI, w_IE, beta)
     
     T = 1.0
     dt = 0.001
     range_t = 0.0:dt:T
     sampling_rate = T / dt
 
-    E_A = 0.1
+    E_A = 0.4
     E_f = 4
-    E_base = 0.6
+    E_base = 0.4
     E_phase = 0.0
     I_A = 0.0
     I_f = 4
     I_base = 0.0
     I_phase = -(pi / 3)
     
-    df = run_act_oscill_time(model, simulate_benoit_model, range_t, dt, E_A, E_f, E_base, E_phase, I_A, I_f, I_base, I_phase)
+    df = run_act_oscill_time(model, simulate_rafal_model, range_t, dt, E_A, E_f, E_base, E_phase, I_A, I_f, I_base, I_phase)
     plot_oscill_time(df, sampling_rate)
 
 end
@@ -136,5 +141,5 @@ function main_byrne()
 
 end
 
-main_byrne()
+main_raf()
 
