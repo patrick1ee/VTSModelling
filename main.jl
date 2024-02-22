@@ -5,7 +5,7 @@ include("./RafalModel.jl")
 using CSV, DataFrames, FFTW, NeuralDynamics, Plots, Statistics
 using .RafalModel: create_rafal_model, simulate_rafal_model
 using .BenoitModel: create_benoit_model, simulate_benoit_model
-using .ByrneModel: create_byrne_pop, simulate_byrne_pop
+using .ByrneModel: create_byrne_pop, create_if_pop, simulate_byrne_pop, simulate_if_pop
 
 function create_oscill_input(A, f, base, phase, range_t)
     Lt = length(range_t)
@@ -43,6 +43,11 @@ function plot_byrne_single(df)
     p2 = plot(df.t, df.rV, xlabel="t", ylabel="V")
     p3 = plot(df.t, df.rZ, xlabel="t", ylabel="|Z|")
     plot(p1, p2, p3, layout=(3,1))
+    savefig("plots/myplot.png")
+end
+
+function plot_avg_if_activity(df)
+    plot(df.t, df.rVu, xlabel="t", ylabel="V")
     savefig("plots/myplot.png")
 end
 
@@ -89,6 +94,11 @@ function run_byrne_single(p, simulate, range_t, dt)
     return DataFrame(t=range_t, rR=rR, rV=rV, rZ=rZ)
 end
 
+function run_byrne_if(p, simulate, range_t, dt)
+    _, rVu = simulate(p, range_t, dt)
+    return DataFrame(t=range_t, rVu=rVu)
+end
+
 function main_raf()
     # Parameters (time in s)
     N=1
@@ -127,19 +137,26 @@ function main_byrne()
     ks = Float32(1.0)
     kv = Float32(1.0)
     gamma = Float32(0.5)
-    tau = Float32(16.0)
+    tau = Float32(16000.0)
     alpha = Float32(0.5)
 
-    p = create_byrne_pop(ex, ks, kv, gamma, tau, alpha)
+    vth = 1.000
+    vr = -1.000
+
+    #p = create_byrne_pop(ex, ks, kv, gamma, tau, alpha)
+    p = create_if_pop(1000, ex, ks, kv, gamma, tau, alpha, vth, vr)
     
     T = 1000.0
-    dt = 0.001
+    dt = 0.01
     range_t = 0.0:dt:T
     
-    df = run_byrne_single(p, simulate_byrne_pop, range_t, dt)
-    plot_byrne_single(df)
+    #df = run_byrne_single(p, simulate_byrne_pop, range_t, dt)
+    df = run_byrne_if(p, simulate_if_pop, range_t, dt)
+
+    #plot_byrne_single(df)
+    plot_avg_if_activity(df)
 
 end
 
-main_raf()
+main_byrne()
 
