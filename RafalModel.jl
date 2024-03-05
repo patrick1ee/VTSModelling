@@ -40,7 +40,8 @@ export RafalModel, create_rafal_model, simulate_rafal_model
         for i in 2:Lt
             for (j, n) in enumerate(N.nodes)
 
-                C = 0.0
+                C = 0.0        w_IE::Float32
+
                 for (k, _) in enumerate(N.nodes)
                     C += N.W[k,j] * R[k].rE[i-1]
                 end
