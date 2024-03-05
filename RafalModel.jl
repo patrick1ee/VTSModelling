@@ -35,7 +35,7 @@ export RafalModel, create_rafal_model, simulate_rafal_model
     function simulate_rafal_model(N::Network, range_t, dt, theta_E, theta_I)
         # Initial conditions
         Lt = length(range_t)
-        R = [NodeActivity(zeros(Lt), zeros(Lt)) for i in 1:2]
+        R = [NodeActivity(zeros(Lt), zeros(Lt)) for _ in N.nodes]
 
         # Simulate the model
         for i in 2:Lt
