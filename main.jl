@@ -16,22 +16,34 @@ function create_oscill_input(A, f, base, phase, range_t)
     return R
 end
 
-function plot_act_time(df)
-    plot(df.t, [df.rE, df.rI], label=["E" "I"], xlabel="t", ylabel="Activity")
+function plot_act_time(df, N)
+    plots = []
+    for i in 1:N
+        push!(plots, plot(df.T[i], [df.theta_E[i], df.theta_I[i]], label=["E" "I"], xlabel="t", ylabel="Input"))
+        push!(plots, plot(df.T[i], [df.R[i].rE, df.R[i].rI], label=["E" "I"], xlabel="t", ylabel="Activity"))
+    end
+    plot(plots..., layout=(2*N, 1), size=(500, 400*N))
     savefig("plots/myplot.png")
 end
 
-function plot_oscill_time(df, sampling_rate)
+function plot_oscill_time(df, sampling_rate, spec=false)
     freqs = fftshift(fftfreq(length(df.t), sampling_rate))
     F_E = fftshift(fft(df.rE .- mean(df.rE)))
     F_I = fftshift(fft(df.rI .- mean(df.rI)))
 
     p1 = plot(df.t, [df.theta_E, df.theta_I], xlabel="t", ylabel="Input")
     p2 = plot(df.t, [df.rE, df.rI], xlabel="t", ylabel="Activity")
-    p3 = plot(freqs, [abs.(F_E), abs.(F_I)], xlabel="f", xlim=(0, +100), xticks=0:20:100) 
-    plot(p1, p2, p3, layout=(3,1))
+
+    if spec
+        p3 = plot(freqs, [abs.(F_E), abs.(F_I)], xlabel="f", xlim=(0, +100), xticks=0:20:100) 
+        plot(p1, p2, p3, layout=(3,1))
+    else
+        plot(p1, p2, layout=(2,1))
+    end
+
     savefig("plots/myplot.png")
 end
+
 
 function plot_max_min(df)
     plot(df.theta, [df.rE_max, df.rE_min], label=["max" "min"], xlabel="theta_I"*df.input_pop[1], ylabel="E amplitude")
@@ -71,11 +83,12 @@ function run_max_min(m, simulate, range_t, dt, range_theta_input, theta_const, i
 end
 
 function run_act_time(m, simulate, range_t, dt, theta_E, theta_I)
-    theta_E_t = fill(theta_E, length(range_t))
-    theta_I_t = fill(theta_I, length(range_t))
+    theta_E_t = [fill(i, length(range_t)) for i in theta_E]
+    theta_I_t = [fill(i, length(range_t)) for i in theta_I]
 
-    rE, rI = simulate(m, range_t, dt, theta_E_t, theta_I_t)
-    return DataFrame(t=range_t, rE=rE, rI=rI)
+    R = simulate(m, range_t, dt, theta_E_t, theta_I_t)
+    T = [range_t for i in 1:length(theta_E)]
+    return DataFrame(T=T, R=R, theta_E=theta_E_t, theta_I=theta_I_t)
 end
 
 function run_act_oscill_time(m, simulate, range_t, dt, E_A, E_f, E_base, E_phase, I_A, I_f, I_base, I_phase)
@@ -101,8 +114,9 @@ end
 
 function main_raf()
     # Parameters (time in s)
-    N=1
-    W=Float32[0.0]
+    N=2
+    W=[Float32(0.0) Float32(0.0); Float32(0.0) Float32(0.0)]
+    etta=Float32(1.0)
     tau_E = Float32(0.0032)
     tau_I = Float32(0.0032)
     w_EE = Float32(2.4)
@@ -110,24 +124,27 @@ function main_raf()
     w_IE = Float32(2.0)
     beta = Float32(4.0)
 
-    model = create_rafal_model(N, W, tau_E, tau_I, w_EE, w_EI, w_IE, beta)
+    model = create_rafal_model(N, W, etta, tau_E, tau_I, w_EE, w_EI, w_IE, beta)
     
     T = 1.0
     dt = 0.001
     range_t = 0.0:dt:T
     sampling_rate = T / dt
 
-    E_A = 0.4
-    E_f = 4
-    E_base = 0.4
-    E_phase = 0.0
-    I_A = 0.0
-    I_f = 4
-    I_base = 0.0
-    I_phase = -(pi / 3)
-    
-    df = run_act_oscill_time(model, simulate_rafal_model, range_t, dt, E_A, E_f, E_base, E_phase, I_A, I_f, I_base, I_phase)
-    plot_oscill_time(df, sampling_rate)
+    #E_A = 0.0
+    #E_f = 4
+    #E_base = 1.22
+    #E_phase = 0.0
+    #I_A = 0.0
+    #I_f = 4
+    #I_base = 0.0
+    #I_phase = -(pi / 3)
+    #df = run_act_oscill_time(model, simulate_rafal_model, range_t, dt, E_A, E_f, E_base, E_phase, I_A, I_f, I_base, I_phase)
+
+    theta_E = [1.22, 0.68]
+    theta_I = [0.0, 0.0]
+    df = run_act_time(model, simulate_rafal_model, range_t, dt, theta_E, theta_I)
+    plot_act_time(df, N)
 
 end
 
@@ -158,5 +175,5 @@ function main_byrne()
 
 end
 
-main_byrne()
+main_raf()
 
