@@ -28,6 +28,18 @@ function plot_act_time(df, N)
     savefig("plots/myplot.png")
 end
 
+function plot_spec(df, N, sampling_rate)
+    plots = []
+    for i in 1:N
+        freqs = fftshift(fftfreq(length(df.T[i]), sampling_rate))
+        F_E = fftshift(fft(df.R[i].rE .- mean(df.R[i].rE)))
+        F_I = fftshift(fft(df.R[i].rI .- mean(df.R[i].rI)))
+        push!(plots, plot(freqs, [abs.(F_E), abs.(F_I)], xlabel="f", xlim=(6, +14), xticks=6:2:14) )
+    end
+    plot(plots..., layout=(1, 2*N), size=(600*N, 300))
+    savefig("plots/myplot2.png")
+end
+
 function plot_oscill_time(df, sampling_rate, spec=false)
     freqs = fftshift(fftfreq(length(df.t), sampling_rate))
     F_E = fftshift(fft(df.rE .- mean(df.rE)))
@@ -121,8 +133,8 @@ function main_raf()
     N=2
     W=[Float32(0.0) Float32(1.0); Float32(1.0) Float32(0.0)]
     etta=Float32(1.0)
-    tau_E = Float32(0.0032)
-    tau_I = Float32(0.0032)
+    tau_E = Float32(0.0176)
+    tau_I = Float32(0.0176)
     w_EE = Float32(2.4)
     w_EI = Float32(2.0)
     w_IE = Float32(2.0)
@@ -150,7 +162,7 @@ function main_raf()
 
     #stim=create_stimulus(A, f, range_t)
     #response=create_stim_response(stim, range_t)
-    response = yousif_transfer(A, f, range_t)
+    response = fill(0.0, length(range_t)) #yousif_transfer(A, f, range_t)
 
     theta_E = [0.68, 0.68]
     theta_I = [0.0, 0.0]
@@ -158,6 +170,7 @@ function main_raf()
     df = run_act_time(model, simulate_benoit_model, range_t, dt, theta_E, theta_I, stim)
 
     plot_act_time(df, N)
+    plot_spec(df, N, sampling_rate)
 
 end
 
