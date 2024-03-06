@@ -1,11 +1,13 @@
 include("./BenoitModel.jl")
 include("./ByrneModel.jl")
 include("./RafalModel.jl")
+include("./Stimulation.jl")
 
 using CSV, DataFrames, FFTW, NeuralDynamics, Plots, Statistics
 using .RafalModel: create_rafal_model, simulate_rafal_model
 using .BenoitModel: create_benoit_model, simulate_benoit_model
 using .ByrneModel: create_byrne_pop, create_if_pop, simulate_byrne_pop, simulate_if_pop
+using .Stimulation: create_stimulus, create_stim_response, yousif_transfer
 
 function create_oscill_input(A, f, base, phase, range_t)
     Lt = length(range_t)
@@ -82,9 +84,13 @@ function run_max_min(m, simulate, range_t, dt, range_theta_input, theta_const, i
    return DataFrame(theta=range_theta_input, rE_max=rE_max, rE_min=rE_min, input_pop=input_pop)
 end
 
-function run_act_time(m, simulate, range_t, dt, theta_E, theta_I)
+function run_act_time(m, simulate, range_t, dt, theta_E, theta_I, stim_response)
     theta_E_t = [fill(i, length(range_t)) for i in theta_E]
     theta_I_t = [fill(i, length(range_t)) for i in theta_I]
+
+    for i in 1:length(stim_response)
+        theta_E_t[1][i] = theta_E_t[1][i] .+ stim_response[i]
+    end
 
     R = simulate(m, range_t, dt, theta_E_t, theta_I_t)
     T = [range_t for i in 1:length(theta_E)]
@@ -114,7 +120,7 @@ function main_raf()
     # Parameters (time in s)
     N=2
     W=[Float32(0.0) Float32(1.0); Float32(1.0) Float32(0.0)]
-    etta=Float32(0.0)
+    etta=Float32(1.0)
     tau_E = Float32(0.0032)
     tau_I = Float32(0.0032)
     w_EE = Float32(2.4)
@@ -129,19 +135,27 @@ function main_raf()
     range_t = 0.0:dt:T
     sampling_rate = T / dt
 
-    E_A = 0.1
-    E_f = 4
-    E_base = 0.6
-    E_phase = 0.0
-    I_A = 0.0
-    I_f = 4
-    I_base = 0.0
-    I_phase = -(pi / 3)
-    df = run_act_oscill_time(model, simulate_benoit_model, range_t, dt, E_A, E_f, E_base, E_phase, I_A, I_f, I_base, I_phase)
+    #E_A = 0.1
+    #E_f = 4
+    #E_base = 0.6
+    #E_phase = 0.0
+    #I_A = 0.0
+    #I_f = 4
+    #I_base = 0.0
+    #I_phase = -(pi / 3)
+    #df = run_act_oscill_time(model, simulate_benoit_model, range_t, dt, E_A, E_f, E_base, E_phase, I_A, I_f, I_base, I_phase)
 
-    #theta_E = [0.68, 0.68]
-    #theta_I = [0.0, 0.0]
-    #df = run_act_time(model, simulate_benoit_model, range_t, dt, theta_E, theta_I)
+    A=2*100*1e-3
+    f=4
+
+    #stim=create_stimulus(A, f, range_t)
+    #response=create_stim_response(stim, range_t)
+    response = yousif_transfer(A, f, range_t)
+
+    theta_E = [0.68, 0.68]
+    theta_I = [0.0, 0.0]
+    stim = response
+    df = run_act_time(model, simulate_benoit_model, range_t, dt, theta_E, theta_I, stim)
 
     plot_act_time(df, N)
 
@@ -172,6 +186,19 @@ function main_byrne()
     plot_byrne_single(df)
     #plot_avg_if_activity(df)
 
+end
+
+function main_stim()
+    A=100*1e-6
+    f=10
+    T = 1.0
+    dt = 0.001
+    range_t = 0.0:dt:T
+
+    stim=create_stimulus(A, f, range_t)
+    response=create_stim_response(stim, range_t)
+    plot(range_t, response, xlabel="t", ylabel="Activity")
+    savefig("plot2.png")
 end
 
 main_raf()
