@@ -2,7 +2,7 @@ module ByrneModel
 
     using DiffEqNoiseProcess, Distributions, JSON, Plots
 
-    export ByrneModel, create_byrne_pop, create_if_pop, simulate_byrne_pop, simulate_if_pop
+    export ByrneModel, create_byrne_pop, create_byrne_pop_EI, create_byrne_network, create_if_pop, simulate_if_pop, simulate_byrne_EI_network
 
     struct IFPopulation
         N::Int32
@@ -16,30 +16,56 @@ module ByrneModel
         vr
     end
 
-    struct Population
+    struct EIPopulation
         ex::Float32
-        ks::Float32
-        kv::Float32
         gamma::Float32 # Hetereogeneity parameter
         tau::Float32
-        alpha::Float32
+    end
+
+    struct Node
+        kv_EE::Float32
+        kv_EI::Float32
+        kv_IE::Float32
+        kv_II::Float32
+        ks_EE::Float32
+        ks_EI::Float32
+        ks_IE::Float32
+        ks_II::Float32
+        alpha_EE::Float32
+        alpha_EI::Float32
+        alpha_IE::Float32
+        alpha_II::Float32
+        E::EIPopulation
+        I::EIPopulation
     end
 
     struct Network
-        ex::Float32
-        ks::Float32
-        kv::Float32
-        gamma::Float32 # Hetereogeneity parameter
-        tau::Float32
-        w_IE::Float32
-        beta::Float32
-        WE
-        WI
+        nodes::Array{Node, 1}
+        W::Matrix{Float32}
+        etta::Float32
+    end
+
+    struct NodeActivity
+        rR_E::Array{Float32, 1}
+        rV_E::Array{Float32, 1}
+        rZ_E::Array{Float32, 1}
+        rR_I::Array{Float32, 1}
+        rV_I::Array{Float32, 1}
+        rZ_I::Array{Float32, 1}
     end
     
 
     function create_byrne_pop(ex::Float32, ks::Float32, kv::Float32, gamma::Float32, tau::Float32, alpha::Float32)
         return Population(ex, ks, kv, gamma, tau, alpha)
+    end
+
+    function create_byrne_pop_EI(ex::Float32, gamma::Float32, tau::Float32)
+        return EIPopulation(ex, gamma, tau)
+    end
+
+    function create_byrne_network(N::Int64, W::Matrix{Float32}, etta::Float32, E::EIPopulation, I::EIPopulation, ks::Float32, kv::Float32, alpha::Float32)
+        nodes = [Node(kv, kv, kv, kv, ks, ks, ks, ks, alpha, alpha, alpha, alpha, E, I) for _ in 1:N]
+        return Network(nodes, W, etta)
     end
 
     function create_if_pop(N, ex::Float32, ks::Float32, kv::Float32, gamma::Float32, tau::Float32, alpha::Float32, vth, vr)
@@ -51,8 +77,8 @@ module ByrneModel
         return (1 - w) / (1 + w)
     end
 
-    function get_synaptic_activity(p, t)
-        return p.alpha^2 * t * exp(-p.alpha * t)
+    function get_synaptic_activity(alpha, dt, R)
+        return R / (1 + (1 / alpha) * dt)^2
     end
 
     function simulate_if_pop_timestep(p, rV_prev, dt)
@@ -105,26 +131,34 @@ module ByrneModel
         return rV,rVu
     end
 
-    function simulate_byrne_pop(p::Population, range_t, dt)
+    function simulate_byrne_EI_network(N::Network, range_t, dt)
         # Initial conditions
         Lt = length(range_t)
-        rR = zeros(Lt)
-        rV = zeros(Lt)
-        rZ = zeros(Lt)
+        R = [NodeActivity(zeros(Lt), zeros(Lt), zeros(Lt), zeros(Lt), zeros(Lt), zeros(Lt)) for _ in N.nodes]
 
         # Simulate the model
         for i in 2:Lt
-            drR = (dt / p.tau) * (-p.kv * rR[i-1] + 2 * rR[i-1] * rV[i-1] + p.gamma / (pi * p.tau))
+            for (j, n) in enumerate(N.nodes)
+                drR_E = (dt / n.E.tau) * (-R[j].rR_E[i-1] * (n.kv_EE + n.kv_EI) + 2 * R[j].rR_E[i-1] * R[j].rV_E[i-1] + n.E.gamma / (pi * n.E.tau))
+                drR_I = (dt / n.I.tau) * (-R[j].rR_I[i-1] * (n.kv_IE + n.kv_II) + 2 * R[j].rR_I[i-1] * R[j].rV_I[i-1] + n.I.gamma / (pi * n.I.tau))
 
-            U = get_synaptic_activity(p, range_t[i-1])
-            drV = (dt / p.tau) * (p.ex + rV[i-1]^2 - pi^2 * p.tau^2 * rR[i-1]^2 + p.ks * U)
+                U_E = n.ks_EE *get_synaptic_activity(n.alpha_EE, dt, R[j].rR_E[i-1]) + n.ks_EI *get_synaptic_activity(n.alpha_EI, dt, R[j].rR_E[i-1])
+                U_I = n.ks_IE *get_synaptic_activity(n.alpha_IE, dt, R[j].rR_I[i-1]) + n.ks_II *get_synaptic_activity(n.alpha_II, dt, R[j].rR_I[i-1])
 
-            rR[i] = rR[i-1] + drR
-            rV[i] = rV[i-1] + drV
-            rZ[i] = abs(get_kuramoto_parameter(rR[i], rV[i], p.tau))
+                drV_E = (dt / n.E.tau) * (n.E.ex + R[j].rV_E[i-1]^2 - pi^2 * n.E.tau^2 * R[j].rR_E[i-1]^2 + U_E + n.kv_EI * (R[j].rV_I[i-1] - R[j].rV_E[i-1]))
+                drV_I = (dt / n.I.tau) * (n.I.ex + R[j].rV_I[i-1]^2 - pi^2 * n.I.tau^2 * R[j].rR_I[i-1]^2 + U_I + n.kv_IE * (R[j].rV_E[i-1] - R[j].rV_I[i-1]))
+
+                R[j].rR_E[i] = R[j].rR_E[i-1] + drR_E
+                R[j].rR_I[i] = R[j].rR_I[i-1] + drR_I
+                R[j].rV_E[i] = R[j].rV_E[i-1] + drV_E
+                R[j].rV_I[i] = R[j].rV_I[i-1] + drV_I
+
+                R[j].rZ_E[i] = abs(get_kuramoto_parameter(R[j].rR_E[i], R[j].rV_E[i], n.E.tau))
+                R[j].rZ_I[i] = abs(get_kuramoto_parameter(R[j].rR_I[i], R[j].rV_I[i], n.I.tau))
+            end
 
         end
-        return rR, rV, rZ
+        return R
     end
 
 
