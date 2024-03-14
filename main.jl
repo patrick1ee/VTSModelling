@@ -25,7 +25,7 @@ function plot_act_time(df, N)
         push!(plots, plot(df.T[i], [df.R[i].rE, df.R[i].rI], label=["E" "I"], xlabel="t", ylabel="Activity"))
     end
     plot(plots..., layout=(2*N, 1), size=(500, 400*N))
-    savefig("plots/myplot.png")
+    savefig("plots/act.png")
 end
 
 function plot_spec(df, N, sampling_rate)
@@ -34,10 +34,10 @@ function plot_spec(df, N, sampling_rate)
         freqs = fftshift(fftfreq(length(df.T[i]), sampling_rate))
         F_E = fftshift(fft(df.R[i].rE .- mean(df.R[i].rE)))
         F_I = fftshift(fft(df.R[i].rI .- mean(df.R[i].rI)))
-        push!(plots, plot(freqs, [abs.(F_E), abs.(F_I)], xlabel="f", xlim=(6, +14), xticks=6:2:14) )
+        push!(plots, plot(freqs, [abs.(F_E), abs.(F_I)], xlabel="f", xlim=(0, +10), xticks=0:2:10) )
     end
     plot(plots..., layout=(1, 2*N), size=(600*N, 300))
-    savefig("plots/myplot2.png")
+    savefig("plots/spec.png")
 end
 
 function plot_oscill_time(df, sampling_rate, spec=false)
@@ -49,7 +49,7 @@ function plot_oscill_time(df, sampling_rate, spec=false)
     p2 = plot(df.t, [df.rE, df.rI], xlabel="t", ylabel="Activity")
 
     if spec
-        p3 = plot(freqs, [abs.(F_E), abs.(F_I)], xlabel="f", xlim=(0, +100), xticks=0:20:100) 
+        p3 = plot(freqs, [abs.(F_E), abs.(F_I)], xlabel="f", xlim=(0, +100), xticks=0:2:10) 
         plot(p1, p2, p3, layout=(3,1))
     else
         plot(p1, p2, layout=(2,1))
@@ -135,22 +135,32 @@ end
 
 function main_raf()
     # Parameters (time in s)
-    N=2
+    #N=2
+    #W=[Float32(0.0) Float32(1.0); Float32(1.0) Float32(0.0)]
+    #etta=Float32(1.0)
+    #tau_E = Float32(0.0176)
+    #tau_I = Float32(0.0176)
+    #w_EE = Float32(2.4)
+    #w_EI = Float32(2.0)
+    #w_IE = Float32(2.0)
+    #beta = Float32(4.0)
+
+    N=1
     W=[Float32(0.0) Float32(1.0); Float32(1.0) Float32(0.0)]
     etta=Float32(1.0)
-    tau_E = Float32(0.0176)
-    tau_I = Float32(0.0176)
-    w_EE = Float32(2.4)
-    w_EI = Float32(2.0)
-    w_IE = Float32(2.0)
-    beta = Float32(4.0)
+    tau_E = Float32(0.0758)
+    tau_I = Float32(0.0758)
+    w_EE = Float32(6.7541)
+    w_EI = Float32(9.6306)
+    w_IE = Float32(9.4014)
+    beta = Float32(1.1853)
 
     model = create_benoit_model(N, W, etta, tau_E, tau_I, w_EE, w_EI, w_IE, beta)
     
-    T = 1.0
+    T = 15.0
     dt = 0.001
     range_t = 0.0:dt:T
-    sampling_rate = T / dt
+    sampling_rate = 1.0 / dt
 
     #E_A = 0.1
     #E_f = 4
@@ -168,9 +178,16 @@ function main_raf()
     #stim=create_stimulus(A, f, range_t)
     #response=create_stim_response(stim, range_t)
     response = fill(0.0, length(range_t)) #yousif_transfer(A, f, range_t)
-
-    theta_E = [0.68, 0.68]
-    theta_I = [0.0, 0.0]
+    for i in 1:6:T-6
+        #Start pulse
+        for j in 0:24
+            for k in 0:2:10
+                response[Int64(trunc(i*1000+j*200+k*(1000/130)))] = 0.001684
+            end
+        end
+    end
+    theta_E = [1.4240]
+    theta_I = [-3.2345]
     stim = response
     df = run_act_time(model, simulate_benoit_model, range_t, dt, theta_E, theta_I, stim)
 
@@ -226,5 +243,5 @@ function main_stim()
     savefig("plot2.png")
 end
 
-main_byrne()
+main_raf()
 
