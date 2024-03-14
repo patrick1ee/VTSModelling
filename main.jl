@@ -158,9 +158,9 @@ end
 
 function plot_hilbert_amplitude_pdf(signal::Array{Float32, 1},T, sampling_rate, bandwidth=0.1)
     x, y, ha = hilbert_amplitude_pdf(signal, bandwidth=bandwidth)
-    plot(x, y, xlabel="Amplitude", ylabel="Density")
+    plot(x, y, xlabel="Amplitude", ylabel="Density", ylim=(0.0, 1.0), xlim=(0, 6))
     savefig("plots/hilbert_amp_pdf.png")
-    plot(T, ha, xlabel="Amplitude", ylabel="Density")
+    plot(T, ha, xlabel="Amplitude", ylabel="Amplitude")
     savefig("plots/hilbert_amp.png")
 
     freqs = fftshift(fftfreq(length(T), sampling_rate))
@@ -183,7 +183,7 @@ function main_raf()
     #w_IE = Float32(2.0)
     #beta = Float32(4.0)
 
-    N=1
+    N=2
     W=[Float32(0.0) Float32(1.0); Float32(1.0) Float32(0.0)]
     etta=Float32(1.0)
     tau_E = Float32(0.0758)
@@ -195,7 +195,7 @@ function main_raf()
 
     model = create_benoit_model(N, W, etta, tau_E, tau_I, w_EE, w_EI, w_IE, beta)
     
-    T = 100.0
+    T = 1.0
     dt = 0.001
     range_t = 0.0:dt:T
     sampling_rate = 1.0 / dt
@@ -220,12 +220,12 @@ function main_raf()
         #Start pulse
         for j in 0:24
             for k in 0:2:10
-                response[Int64(trunc(i*1000+j*200+k*(1000/130)))] = 0.1684
+                response[Int64(trunc(i*1000+j*200+k*(1000/130)))] = 0.001684
             end
         end
     end
-    theta_E = [1.4240]
-    theta_I = [-3.2345]
+    theta_E = [1.4240, 1.4240]
+    theta_I = [-3.2345, -3.2345]
     stim = response
     df = run_act_time(model, simulate_benoit_model, range_t, dt, theta_E, theta_I, stim)
 
@@ -239,14 +239,14 @@ end
 
 function main_byrne()
     # Parameters (time in ms)
-    N=1
+    N=2
     W=[Float32(0.0) Float32(1.0); Float32(1.0) Float32(0.0)]
     etta=Float32(1.0)
-    ex = Float32(2.0)
+    ex = Float32(0.5)
     ks = Float32(0.5)
     kv = Float32(0.5)
     gamma = Float32(0.5)
-    tau = Float32(16.0)
+    tau = Float32(8.9)
     alpha = Float32(0.5)
 
     vth = 1.000
@@ -258,8 +258,8 @@ function main_byrne()
     I = create_byrne_pop_EI(ex, gamma, tau)
     N = create_byrne_network(N, W, etta, E, I, ks, kv, alpha)
     
-    T = 15.0
-    dt = 0.001
+    T = 1000
+    dt = 1.0
     range_t = 0.0:dt:T
     
     #df = run_byrne_single(p, simulate_byrne_pop, range_t, dt)
@@ -284,5 +284,5 @@ function main_stim()
     savefig("plot2.png")
 end
 
-main_raf()
+main_byrne()
 

@@ -37,6 +37,8 @@ module ByrneModel
         alpha_II::Float32
         E::EIPopulation
         I::EIPopulation
+        WE
+        WI
     end
 
     struct Network
@@ -63,8 +65,10 @@ module ByrneModel
         return EIPopulation(ex, gamma, tau)
     end
 
+    NOISE_DEV = 0.0457
+
     function create_byrne_network(N::Int64, W::Matrix{Float32}, etta::Float32, E::EIPopulation, I::EIPopulation, ks::Float32, kv::Float32, alpha::Float32)
-        nodes = [Node(kv, kv, kv, kv, ks, ks, ks, ks, alpha, alpha, alpha, alpha, E, I) for _ in 1:N]
+        nodes = [Node(kv, kv, kv, kv, ks, ks, ks, ks, alpha, alpha, alpha, alpha, E, I, WienerProcess(0.0,NOISE_DEV, 1.0), WienerProcess(0.0,NOISE_DEV, 1.0)) for _ in 1:N]
         return Network(nodes, W, etta)
     end
 
@@ -136,6 +140,19 @@ module ByrneModel
         Lt = length(range_t)
         R = [NodeActivity(zeros(Lt), zeros(Lt), zeros(Lt), zeros(Lt), zeros(Lt), zeros(Lt)) for _ in N.nodes]
 
+        uWE = [nothing for _ in N.nodes];
+        pWE = [nothing for _ in N.nodes]; # for state-dependent distributions
+        uWI = [nothing for _ in N.nodes];
+        pWI = [nothing for _ in N.nodes];
+        
+        for (j, n) in enumerate(N.nodes)
+            n.WE.dt = dt
+            n.WI.dt = dt
+            calculate_step!(n.WE, dt, uWE[j], pWE[j])
+            calculate_step!(n.WI, dt, uWI[j], pWI[j])
+        end
+
+
         # Simulate the model
         for i in 2:Lt
             for (j, n) in enumerate(N.nodes)
@@ -148,10 +165,13 @@ module ByrneModel
                 drV_E = (dt / n.E.tau) * (n.E.ex + R[j].rV_E[i-1]^2 - pi^2 * n.E.tau^2 * R[j].rR_E[i-1]^2 + U_E + n.kv_EI * (R[j].rV_I[i-1] - R[j].rV_E[i-1]))
                 drV_I = (dt / n.I.tau) * (n.I.ex + R[j].rV_I[i-1]^2 - pi^2 * n.I.tau^2 * R[j].rR_I[i-1]^2 + U_I + n.kv_IE * (R[j].rV_E[i-1] - R[j].rV_I[i-1]))
 
+                accept_step!(n.WE, dt, uWE[j], pWE[j])
+                accept_step!(n.WI, dt, uWI[j], pWI[j])
+
                 R[j].rR_E[i] = R[j].rR_E[i-1] + drR_E
                 R[j].rR_I[i] = R[j].rR_I[i-1] + drR_I
-                R[j].rV_E[i] = R[j].rV_E[i-1] + drV_E
-                R[j].rV_I[i] = R[j].rV_I[i-1] + drV_I
+                R[j].rV_E[i] = R[j].rV_E[i-1] + drV_E + NOISE_DEV * (n.WE[i] - n.WE[i - 1])
+                R[j].rV_I[i] = R[j].rV_I[i-1] + drV_I + NOISE_DEV * (n.WI[i] - n.WI[i - 1])
 
                 R[j].rZ_E[i] = abs(get_kuramoto_parameter(R[j].rR_E[i], R[j].rV_E[i], n.E.tau))
                 R[j].rZ_I[i] = abs(get_kuramoto_parameter(R[j].rR_I[i], R[j].rV_I[i], n.I.tau))

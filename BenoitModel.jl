@@ -29,7 +29,7 @@ module BenoitModel
     NOISE_DEV = 0.0457
 
     function create_benoit_model(N::Int64, W::Matrix{Float32}, etta::Float32, tau_E::Float32, tau_I::Float32, w_EE::Float32, w_EI::Float32, w_IE::Float32, beta::Float32)
-        nodes = [Node(tau_E, tau_I, w_EE, w_EI, w_IE, beta, WienerProcess(0.0, 1.0, 1.0), WienerProcess(0.0, 1.0, 1.0)) for _ in 1:N]
+        nodes = [Node(tau_E, tau_I, w_EE, w_EI, w_IE, beta, WienerProcess(0.0,NOISE_DEV, 1.0), WienerProcess(0.0,NOISE_DEV, 1.0)) for _ in 1:N]
         return Network(nodes, W, etta)
     end
 
