@@ -1,6 +1,6 @@
 module BenoitModel
 
-    using DiffEqNoiseProcess, JSON, Plots
+    using DiffEqNoiseProcess, JSON, Plots, StatsBase
 
     export BenoitModel, create_benoit_model, simulate_benoit_model
 

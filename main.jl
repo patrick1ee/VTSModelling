@@ -3,7 +3,7 @@ include("./ByrneModel.jl")
 include("./RafalModel.jl")
 include("./Stimulation.jl")
 
-using CSV, DataFrames, FFTW, NeuralDynamics, Plots, Statistics
+using ControlSystems, CSV, DataFrames, DSP, FFTW, KernelDensity, LsqFit, NeuralDynamics, Plots, Statistics, StatsBase
 using .RafalModel: create_rafal_model, simulate_rafal_model
 using .BenoitModel: create_benoit_model, simulate_benoit_model
 using .ByrneModel: create_byrne_pop, create_byrne_pop_EI, create_byrne_network, create_if_pop, simulate_if_pop, simulate_byrne_EI_network
@@ -105,6 +105,19 @@ function run_act_time(m, simulate, range_t, dt, theta_E, theta_I, stim_response)
     end
 
     R = simulate(m, range_t, dt, theta_E_t, theta_I_t)
+    lR = length(R)
+    for i in 1:lR
+        urE = mean(R[i].rE)
+        srE = std(R[i].rE)
+        urI = mean(R[i].rI)
+        srI = std(R[i].rI)
+
+        for j in 1:length(R[i].rE)
+            R[i].rE[j] = (R[i].rE[j] - urE) / srE
+            R[i].rI[j] = (R[i].rI[j] - urI) / srI
+        end
+    end
+
     T = [range_t for i in 1:length(theta_E)]
     return DataFrame(T=T, R=R, theta_E=theta_E_t, theta_I=theta_I_t)
 end
@@ -133,6 +146,31 @@ function run_byrne_if(p, simulate, range_t, dt)
     return DataFrame(t=range_t, rVu=rVu)
 end
 
+function hilbert_amplitude_pdf(signal::Array{Float32, 1}; bandwidth=0.1)
+    hilbert_transform = hilbert(signal)
+    hilbert_amp = abs.(hilbert_transform)
+    
+    # Estimate PDF using kernel density estimation
+    U = kde(hilbert_amp, bandwidth=bandwidth)
+    
+    return U.x, U.density, hilbert_amp
+end
+
+function plot_hilbert_amplitude_pdf(signal::Array{Float32, 1},T, sampling_rate, bandwidth=0.1)
+    x, y, ha = hilbert_amplitude_pdf(signal, bandwidth=bandwidth)
+    plot(x, y, xlabel="Amplitude", ylabel="Density")
+    savefig("plots/hilbert_amp_pdf.png")
+    plot(T, ha, xlabel="Amplitude", ylabel="Density")
+    savefig("plots/hilbert_amp.png")
+
+    freqs = fftshift(fftfreq(length(T), sampling_rate))
+    F_A = fftshift(fft(ha))
+    plot(freqs, abs.(F_A), xlabel="f", xlim=(0.1, +10), xticks=0.1:2:10)
+    savefig("plots/hilbert_psd.png")
+
+end
+
+
 function main_raf()
     # Parameters (time in s)
     #N=2
@@ -157,7 +195,7 @@ function main_raf()
 
     model = create_benoit_model(N, W, etta, tau_E, tau_I, w_EE, w_EI, w_IE, beta)
     
-    T = 15.0
+    T = 100.0
     dt = 0.001
     range_t = 0.0:dt:T
     sampling_rate = 1.0 / dt
@@ -182,7 +220,7 @@ function main_raf()
         #Start pulse
         for j in 0:24
             for k in 0:2:10
-                response[Int64(trunc(i*1000+j*200+k*(1000/130)))] = 0.001684
+                response[Int64(trunc(i*1000+j*200+k*(1000/130)))] = 0.1684
             end
         end
     end
@@ -191,9 +229,12 @@ function main_raf()
     stim = response
     df = run_act_time(model, simulate_benoit_model, range_t, dt, theta_E, theta_I, stim)
 
+    #filter = digitalfilter(Bandpass(3.0,7.0),Butterworth(2))
+    #df.R[1].rE = filtfilt(filter, df.R[1].rE)
+
     plot_act_time(df, N)
     plot_spec(df, N, sampling_rate)
-
+    plot_hilbert_amplitude_pdf(df.R[1].rE, df.T[1], sampling_rate)
 end
 
 function main_byrne()
@@ -217,7 +258,7 @@ function main_byrne()
     I = create_byrne_pop_EI(ex, gamma, tau)
     N = create_byrne_network(N, W, etta, E, I, ks, kv, alpha)
     
-    T = 1000.0
+    T = 15.0
     dt = 0.001
     range_t = 0.0:dt:T
     
