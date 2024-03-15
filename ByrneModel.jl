@@ -156,6 +156,13 @@ module ByrneModel
         # Simulate the model
         for i in 2:Lt
             for (j, n) in enumerate(N.nodes)
+                
+                C = 0.0
+                for (k, _) in enumerate(N.nodes)
+                    C += N.W[k,j] * R[k].rE[i-1]
+                end
+                C = N.etta * C / length(N.nodes)
+
                 drR_E = (dt / n.E.tau) * (-R[j].rR_E[i-1] * (n.kv_EE + n.kv_EI) + 2 * R[j].rR_E[i-1] * R[j].rV_E[i-1] + n.E.gamma / (pi * n.E.tau))
                 drR_I = (dt / n.I.tau) * (-R[j].rR_I[i-1] * (n.kv_IE + n.kv_II) + 2 * R[j].rR_I[i-1] * R[j].rV_I[i-1] + n.I.gamma / (pi * n.I.tau))
 

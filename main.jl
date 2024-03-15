@@ -3,7 +3,7 @@ include("./ByrneModel.jl")
 include("./RafalModel.jl")
 include("./Stimulation.jl")
 
-using ControlSystems, CSV, DataFrames, DSP, FFTW, KernelDensity, LsqFit, NeuralDynamics, Plots, Statistics, StatsBase
+using ControlSystems, CSV, CurveFit, DataFrames, DSP, FFTW, KernelDensity, LsqFit, NeuralDynamics, Plots, Statistics, StatsBase
 using .RafalModel: create_rafal_model, simulate_rafal_model
 using .BenoitModel: create_benoit_model, simulate_benoit_model
 using .ByrneModel: create_byrne_pop, create_byrne_pop_EI, create_byrne_network, create_if_pop, simulate_if_pop, simulate_byrne_EI_network
@@ -28,15 +28,21 @@ function plot_act_time(df, N)
     savefig("plots/act.png")
 end
 
+function gaussian(x, A, μ, σ)
+    return A * exp.(-(x - μ).^2 / (2 * σ^2))
+end
+
 function plot_spec(df, N, sampling_rate)
     plots = []
     for i in 1:N
         freqs = fftshift(fftfreq(length(df.T[i]), sampling_rate))
         F_E = fftshift(fft(df.R[i].rE .- mean(df.R[i].rE)))
-        F_I = fftshift(fft(df.R[i].rI .- mean(df.R[i].rI)))
-        push!(plots, plot(freqs, [abs.(F_E), abs.(F_I)], xlabel="f", xlim=(0, +10), xticks=0:2:10) )
+        #F_I = fftshift(fft(df.R[i].rI .- mean(df.R[i].rI)))
+        #push!(plots, plot(freqs, [abs.(F_E), abs.(F_I)], xlabel="f", xlim=(0, +10), xticks=0:2:10) )
+
+        plot(freqs, abs.(F_E ./ (1.5*10e3)), xlabel="frequency (Hz)", xlim=(0, +10), xticks=0:5:10, yticks=0:0.5:1.6, size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
     end
-    plot(plots..., layout=(1, 2*N), size=(600*N, 300))
+    #plot(plots..., layout=(1, N), size=(700*N,750))
     savefig("plots/spec.png")
 end
 
@@ -158,14 +164,14 @@ end
 
 function plot_hilbert_amplitude_pdf(signal::Array{Float32, 1},T, sampling_rate, bandwidth=0.1)
     x, y, ha = hilbert_amplitude_pdf(signal, bandwidth=bandwidth)
-    plot(x, y, xlabel="Amplitude", ylabel="Density", ylim=(0.0, 1.0), xlim=(0, 6))
+    plot(x, y, xlabel="amplitude", ylim=(0.0, 1.0), xlim=(0, 6), xticks=0:2:6, yticks=0:0.5:1.0, size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
     savefig("plots/hilbert_amp_pdf.png")
     plot(T, ha, xlabel="Amplitude", ylabel="Amplitude")
     savefig("plots/hilbert_amp.png")
 
     freqs = fftshift(fftfreq(length(T), sampling_rate))
     F_A = fftshift(fft(ha))
-    plot(freqs, abs.(F_A), xlabel="f", xlim=(0.1, +10), xticks=0.1:2:10)
+    plot(freqs, abs.(F_A ./ (1.5*10e3)), xlabel="envelope frequency (Hz)", xlim=(0, +10), ylim=(0.0, 1.0), linewidth=3, xticks=0:5:10, yticks=0:0.5:1.5, size=(500,500), xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
     savefig("plots/hilbert_psd.png")
 
 end
@@ -185,7 +191,7 @@ function main_raf()
 
     N=2
     W=[Float32(0.0) Float32(1.0); Float32(1.0) Float32(0.0)]
-    etta=Float32(1.0)
+    etta=Float32(0.5)
     tau_E = Float32(0.0758)
     tau_I = Float32(0.0758)
     w_EE = Float32(6.7541)
@@ -195,7 +201,7 @@ function main_raf()
 
     model = create_benoit_model(N, W, etta, tau_E, tau_I, w_EE, w_EI, w_IE, beta)
     
-    T = 1.0
+    T = 100.0
     dt = 0.001
     range_t = 0.0:dt:T
     sampling_rate = 1.0 / dt
@@ -284,5 +290,5 @@ function main_stim()
     savefig("plot2.png")
 end
 
-main_byrne()
+main_raf()
 

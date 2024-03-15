@@ -67,7 +67,7 @@ module BenoitModel
                 end
                 C = N.etta * C / length(N.nodes)
 
-                drE = (dt / n.tau_E) * (-R[j].rE[i-1] + sigmoid(theta_E[j][i-1] + n.w_EE * R[j].rE[i-1] - n.w_IE * R[j].rI[i-1], n.beta))
+                drE = (dt / n.tau_E) * (-R[j].rE[i-1] + sigmoid(theta_E[j][i-1] + n.w_EE * R[j].rE[i-1] - n.w_IE * R[j].rI[i-1] + C, n.beta))
                 drI = (dt / n.tau_I) * (-R[j].rI[i-1] + sigmoid(theta_I[j][i-1] + n.w_EI * R[j].rE[i-1], n.beta))
 
                 accept_step!(n.WE, dt, uWE[j], pWE[j])
