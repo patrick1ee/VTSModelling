@@ -3,11 +3,14 @@ include("./ByrneModel.jl")
 include("./RafalModel.jl")
 include("./Stimulation.jl")
 
+include("./Optim.jl")
+
 using ControlSystems, CSV, CurveFit, DataFrames, DSP, FFTW, KernelDensity, LsqFit, NeuralDynamics, Plots, Statistics, StatsBase
 using .RafalModel: create_rafal_model, simulate_rafal_model
 using .BenoitModel: create_benoit_model, simulate_benoit_model
 using .ByrneModel: create_byrne_pop, create_byrne_pop_EI, create_byrne_network, create_if_pop, simulate_if_pop, simulate_byrne_EI_network
 using .Stimulation: create_stimulus, create_stim_response, yousif_transfer
+
 
 function create_oscill_input(A, f, base, phase, range_t)
     Lt = length(range_t)
@@ -40,7 +43,9 @@ function plot_spec(df, N, sampling_rate)
         #F_I = fftshift(fft(df.R[i].rI .- mean(df.R[i].rI)))
         #push!(plots, plot(freqs, [abs.(F_E), abs.(F_I)], xlabel="f", xlim=(0, +10), xticks=0:2:10) )
 
-        plot(freqs, abs.(F_E ./ (1.5*10e3)), xlabel="frequency (Hz)", xlim=(0, +10), xticks=0:5:10, yticks=0:0.5:1.6, size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+        plot(freqs, abs.(F_E ./ (1.5*10e3)), xlabel="frequency (Hz)", xlim=(0, +50), xticks=0:10:50, yticks=0:0.5:1.6, size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+        csv_df = DataFrame(Frequency = freqs, PSD = abs.(F_E))
+        #CSV.write("data/psd-"*string(i)*".csv", csv_df)
     end
     #plot(plots..., layout=(1, N), size=(700*N,750))
     savefig("plots/spec.png")
@@ -174,6 +179,13 @@ function plot_hilbert_amplitude_pdf(signal::Array{Float32, 1},T, sampling_rate, 
     plot(freqs, abs.(F_A ./ (1.5*10e3)), xlabel="envelope frequency (Hz)", xlim=(0, +10), ylim=(0.0, 1.0), linewidth=3, xticks=0:5:10, yticks=0:0.5:1.5, size=(500,500), xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
     savefig("plots/hilbert_psd.png")
 
+    csv_df = DataFrame(x=x,y=y)
+    #CSV.write("data/hilber-amp-pdf.csv", csv_df)
+    csv_df = DataFrame(x=T,y=ha)
+    #CSV.write("data/hilber-amp.csv", csv_df)
+    csv_df = DataFrame(x=freqs,y=abs.(F_A))
+    #CSV.write("data/hilber-psd.csv", csv_df)
+
 end
 
 
@@ -192,12 +204,12 @@ function main_raf()
     N=2
     W=[Float32(0.0) Float32(1.0); Float32(1.0) Float32(0.0)]
     etta=Float32(0.5)
-    tau_E = Float32(0.0758)
-    tau_I = Float32(0.0758)
-    w_EE = Float32(6.7541)
-    w_EI = Float32(9.6306)
-    w_IE = Float32(9.4014)
-    beta = Float32(1.1853)
+    tau_E = Float32(0.15408)
+    tau_I = Float32(0.15408)
+    w_EE = Float32(7.33335)
+    w_EI = Float32(24.9774)
+    w_IE = Float32(24.1386)
+    beta = Float32(1.20361)
 
     model = create_benoit_model(N, W, etta, tau_E, tau_I, w_EE, w_EI, w_IE, beta)
     
@@ -230,8 +242,8 @@ function main_raf()
             end
         end
     end
-    theta_E = [1.4240, 1.4240]
-    theta_I = [-3.2345, -3.2345]
+    theta_E = [4.1417, 4.1417]
+    theta_I = [-6.19609, -6.19609]
     stim = response
     df = run_act_time(model, simulate_benoit_model, range_t, dt, theta_E, theta_I, stim)
 
