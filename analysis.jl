@@ -3,14 +3,16 @@ using ApproxFun, CSV, DataFrames, DSP, FFTW, HDF5, Interpolations, LsqFit, NaNSt
 const SR = 1000  # recording sampling rate in Hz, do not change this
 
 function interpolate_nan(arr)
-    indices = findall(isnan, arr)  # Find indices of NaN values
-    non_nan_indices = findall(!isnan, arr)  # Find indices of non-NaN values
-    
-    # Interpolate NaN values using linear interpolation
-    interp = interpolate(non_nan_indices, arr[non_nan_indices], Gridded(Linear()))
-    
-    # Replace NaN values with interpolated values
-    arr[indices] .= map(x -> round(Int, x), evaluate(interp, indices))
+    Larr = length(arr)
+    for i in 1:Larr
+        if isnan(arr[i])
+            j = i
+            while isnan(arr[j])
+                j += 1
+            end
+            arr[i:j-1] .= arr[i-1] .+ (1:j-i) .* (arr[j] .- arr[i-1]) ./ (j-i)
+        end
+    end
     
     return arr
 end
@@ -146,11 +148,7 @@ function plot_spec(sig, freqs=Nothing, sampling_rate=1000)
     if freqs == Nothing 
         freqs = fftshift(fftfreq(length(sig), sampling_rate))
     end
-    sig = sig .* 1e6
     spec = fftshift(fft(sig .- mean(sig)))
-    print(sig)
-    print(spec)
-    print(freqs)
     #spec_fit = curve_fit(model, freqs, abs.(spec), zeros(5))
     #fit_fun = Fun(Chebyshev(Interval(0,50)), spec_fit.param)
     #spec_welch = power(welch_pgram(sig), n=length(freqs))
@@ -181,7 +179,7 @@ function analyse()
     data = read(fid["EEG"])
     close(fid)
 
-    CONST_REF_CHAN = "C3_local"
+    CONST_REF_CHAN = "C3_POz"
     EEG_chan, REF_chan = return_ref_chan(CONST_REF_CHAN, chan_order)
     EEG = data[EEG_chan, :] .- mean([data[i] for i in REF_chan])
     EEG[1] = EEG[2]  # replace the first 0 with the second value
@@ -197,7 +195,7 @@ function analyse()
 
     data_outlierRem = copy(EEG_data)
     data_outlierRem[abs.(med_abs_dev_scores) .> OUTL_THRESHOLD] .= NaN
-    #data_outlierRem = interpolate_nan(data_outlierRem)
+    data_outlierRem = interpolate_nan(data_outlierRem)
 
     responsetype = Lowpass(ERP_LOWPASS_FILTER; fs=SR)
     designmethod = Butterworth(FLT_ORDER)
