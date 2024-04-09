@@ -1,4 +1,4 @@
-using CSV, DataFrames, DSP, FFTW, HDF5, Interpolations, NaNStatistics, Plots, StatsBase, Statistics
+using ApproxFun, CSV, DataFrames, DSP, FFTW, HDF5, Interpolations, LsqFit, NaNStatistics, Plots, StatsBase, Statistics
 
 const SR = 1000  # recording sampling rate in Hz, do not change this
 
@@ -14,6 +14,11 @@ function interpolate_nan(arr)
     
     return arr
 end
+
+function model(x,p) 
+    f = Fun(Chebyshev(Interval(0,50)),p)
+    f.(x)
+ end
 
 function get_chan_idx(chan_order, chan_name)
     chan_idx = findall(x -> x == chan_name, chan_order.chan_name)
@@ -141,13 +146,21 @@ function plot_spec(sig, freqs=Nothing, sampling_rate=1000)
     if freqs == Nothing 
         freqs = fftshift(fftfreq(length(sig), sampling_rate))
     end
+    sig = sig .* 1e6
     spec = fftshift(fft(sig .- mean(sig)))
-    plot(freqs, abs.(spec), xlabel="frequency (Hz)", xlim=(0, +50), xticks=0:10:50, yticks=0:0.5:1.6, size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+    print(sig)
+    print(spec)
+    print(freqs)
+    #spec_fit = curve_fit(model, freqs, abs.(spec), zeros(5))
+    #fit_fun = Fun(Chebyshev(Interval(0,50)), spec_fit.param)
+    #spec_welch = power(welch_pgram(sig), n=length(freqs))
+    plot(freqs, abs.(spec), xlabel="frequency (Hz)", xlim=(0, +60), xticks=0:10:60, size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+    
     savefig("plots/ml_plots/spec.png")
 end
 
 function analyse()
-    data_path = "matlab_analyses/data"
+    data_path = "Patrick_data"
     chan_order = CSV.read("matlab_analyses/EEG_channel_order.csv", DataFrame)
 
     # Define the size of the time-window for computing the ERP (event-related potential)
@@ -160,12 +173,11 @@ function analyse()
     # Do not change these parameters
     FLT_ORDER = 2
 
-    currSubj = "P2"
-    vers = "v2"
+    currSubj = "P20"
     WIN_START = 5  # sec
     WIN_END = 75  # sec
 
-    fid = h5open(data_path*"/"*currSubj*"/08_12_2023_P2_Ch14_FRQ=10Hz_FULL_CL_phase=0_NOSTIM_EC_v2.hdf5", "r")
+    fid = h5open(data_path*"/"*currSubj*"/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1.hdf5", "r")
     data = read(fid["EEG"])
     close(fid)
 
@@ -190,7 +202,7 @@ function analyse()
     responsetype = Lowpass(ERP_LOWPASS_FILTER; fs=SR)
     designmethod = Butterworth(FLT_ORDER)
 
-    data_flt = filt(digitalfilter(responsetype, designmethod), EEG_data)
+    #data_flt = filt(digitalfilter(responsetype, designmethod), EEG_data)
     data_raw = data_outlierRem
     plot_spec(data_raw)
 
