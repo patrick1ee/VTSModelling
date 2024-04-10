@@ -1,7 +1,12 @@
+include("./BenoitModel.jl")
+include("./Signal.jl")
+
 using BlackBoxOptim, CSV, DataFrames, DSP, FFTW, KernelDensity, Plots, Statistics
 
-include("./BenoitModel.jl")
 using .BenoitModel: create_benoit_model, simulate_benoit_model
+using .Signal: get_pow_spec, get_hilbert_amplitude_pdf
+
+const SR = 1000  # recording sampling rate in Hz, do not change this
 
 function run_act_time(m, simulate, range_t, dt, theta_E, theta_I, stim_response)
     theta_E_t = [fill(i, length(range_t)) for i in theta_E]
@@ -27,79 +32,6 @@ function run_act_time(m, simulate, range_t, dt, theta_E, theta_I, stim_response)
 
     T = [range_t for i in 1:length(theta_E)]
     return DataFrame(T=T, R=R, theta_E=theta_E_t, theta_I=theta_I_t)
-end
-
-function get_PSD(E, freqs, verbose)
-    psd = fftshift(fft(E .- mean(E) / std(E)))
-
-    if verbose
-        plot(freqs, abs.(psd ./ (1.5*10e3)), xlabel="frequency (Hz)", xlim=(0, +100), xticks=0:50:100, yticks=0:0.5:1.6, size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
-        savefig("plots/spec-opt.png")
-    end
-
-    return abs.(psd)
-end
-
-function get_hilbert_amplitude_pdf(E, bandwidth=0.001)
-    hilbert_transform = hilbert(E .- mean(E) / std(E))
-    hilbert_amp = abs.(hilbert_transform)
-
-    cleaned_data = replace(hilbert_amp, NaN => 0.0)
-    
-    # Estimate PDF using kernel density estimation
-    try
-        U = kde(cleaned_data)
-        return U.x, U.density, cleaned_data
-    catch err
-        println("Error: ", err)
-        println("Data: ", cleaned_data)
-        return [], [], []
-    end
-
-end
-
-
-function getTrPSD_init(sig, sampling_rate, verbose)
-    freqs = fftshift(fftfreq(length(sig), sampling_rate))
-    yPSD = fftshift(sig)
-
-    #yPSDmean = mean(yPSD, dims=1)
-    yPSDmean = yPSD
-
-    if verbose
-        #plot(freqs, yPSDmean, linewidth=3.5, label="average")
-        plot(freqs, abs.(yPSD ./ (1.5*10e3)), xlabel="frequency (Hz)", xlim=(0, +10), xticks=0:5:10, yticks=0:0.5:1.6, size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
-        xlabel!("frequency (Hz)")
-        ylabel!("PSD")
-        savefig("plots/PSD-opt.png")
-    end
-
-    return yPSDmean
-end
-
-function getTrPSD(sig, fs, trialIdx, freqRange, wLratio, verbose)
-    nTr = size(trialIdx, 1)
-    yPSD = zeros(nTr, length(freqRange))
-
-    for tr in 1:nTr
-        psdIdx = 1#trialIdx[tr, 1]:trialIdx[tr, 2]
-        wLength = round(length(sig[psdIdx]) / wLratio)
-
-        yPSDtr  = fftshift(fft(sig[psdIdx]))
-        yPSD[tr, :] = yPSDtr
-    end
-
-    yPSDmean = mean(yPSD, dims=1)
-
-    if verbose
-        plt = plot(freqRange, yPSD', label=[string("trial #", i) for i in 1:nTr], legend=:topright)
-        plot!(freqRange, yPSDmean', linewidth=3.5, label="average")
-        xlabel!("frequency (Hz)")
-        ylabel!("PSD")
-        savefig("plots/PSD-opt.png")
-    end
-
-    return yPSDmean
 end
 
 function cost_bb(params)
@@ -135,14 +67,16 @@ function cost_bb(params)
     theta_I = [theta_I_param, theta_I_param]
     stim = response
     df = run_act_time(model, simulate_benoit_model, range_t, dt, theta_E, theta_I, stim)
-    Eproc = df.R[1].rE
 
-    psd_df = CSV.read("data/psd-1.csv", DataFrame)
+    #zscore
+    Eproc = df.R[1].rE .- mean(df.R[1].rE) / std(df.R[1].rE)
+
+    psd_df = CSV.read("data/psd.csv", DataFrame)
     xPSD = psd_df[!, 1]
     yPSDdat = psd_df[!, 2]
-    yPSDmod = get_PSD(Eproc, xPSD, false)
+    freq, yPSDmod = get_pow_spec(Eproc, xPSD, SR)
 
-    hpdf_df = CSV.read("data/hilbert-amp-pdf.csv", DataFrame)
+    hpdf_df = CSV.read("data/hpdf.csv", DataFrame)
     yHPDFdat = hpdf_df[!, 2]
     _, yHPDFmod, ha = get_hilbert_amplitude_pdf(Eproc)
 
@@ -153,8 +87,14 @@ function cost_bb(params)
     #F_HA = fftshift(fft(ha))
     #yHPSDmod = abs.(F_HA)
 
-    cost1 = (sum((yPSDdat .- yPSDmod).^2) / sum((yPSDdat .- mean(yPSDdat)).^2)) / 3
-    cost2 = (sum((yHPDFdat .- yHPDFmod).^2) / sum((yHPDFdat .- mean(yHPDFdat)).^2)) / 3
+    if length(yPSDmod) > length(yPSDdat)
+        yPSDmod = yPSDmod[1:length(yPSDdat)]
+    elseif length(yPSDmod) < length(yPSDdat)
+        yPSDdat = yPSDdat[1:length(yPSDmod)]
+    end
+
+    cost1 = (sum((yPSDdat .- yPSDmod).^2) / sum((yPSDdat .- mean(yPSDdat)).^2)) / 2
+    cost2 = (sum((yHPDFdat .- yHPDFmod).^2) / sum((yHPDFdat .- mean(yHPDFdat)).^2)) / 2
     #cost3 = (sum((yHPSDdat .- yHPSDmod).^2) / sum((yHPSDdat .- mean(yHPSDdat)).^2)) / 3
 
     cost = cost1 + cost2 #+ cost3
@@ -163,7 +103,7 @@ function cost_bb(params)
 
     if isfile(filename)
         fileID = open(filename, "w")
-        println(fileID, tau_E, tau_I, w_EE, w_EI, w_IE, beta, "::", cost1, "::", cost2, "::", cost3)
+        println(fileID, tau_E, tau_I, w_EE, w_EI, w_IE, beta, "::", cost1, "::", cost2)
         close(fileID)
     end
 

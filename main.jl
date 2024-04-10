@@ -1,3 +1,5 @@
+include("./analysis.jl")
+
 include("./BenoitModel.jl")
 include("./ByrneModel.jl")
 include("./RafalModel.jl")
@@ -11,7 +13,9 @@ using .BenoitModel: create_benoit_model, simulate_benoit_model
 using .ByrneModel: create_byrne_pop, create_byrne_pop_EI, create_byrne_network, create_if_pop, simulate_if_pop, simulate_byrne_EI_network
 using .Stimulation: create_stimulus, create_stim_response, yousif_transfer
 
-using .Signal: get_hilbert_amplitude_pdf
+using .Signal: get_pow_spec, get_hilbert_amplitude_pdf
+
+using .analysis: run_spec, run_hilbert_pdf
 
 
 function create_oscill_input(A, f, base, phase, range_t)
@@ -183,25 +187,17 @@ end
 
 function main_raf()
     # Parameters (time in s)
-    #N=2
-    #W=[Float32(0.0) Float32(1.0); Float32(1.0) Float32(0.0)]
-    #etta=Float32(1.0)
-    #tau_E = Float32(0.0176)
-    #tau_I = Float32(0.0176)
-    #w_EE = Float32(2.4)
-    #w_EI = Float32(2.0)
-    #w_IE = Float32(2.0)
-    #beta = Float32(4.0)
-
     N=2
+    #[0.0147128, 19.451, 19.0874, 24.8283, 10.9761, -26.5766, 15.5643]
     W=[Float32(0.0) Float32(1.0); Float32(1.0) Float32(0.0)]
     etta=Float32(0.5)
-    tau_E = Float32(0.15408)
-    tau_I = Float32(0.15408)
-    w_EE = Float32(7.33335)
-    w_EI = Float32(24.9774)
-    w_IE = Float32(24.1386)
-    beta = Float32(1.20361)
+    tau_E = Float32(0.0147128)
+    tau_I = Float32(0.0147128)
+    w_EE = Float32(19.451)
+    w_EI = Float32(19.0874)
+    w_IE = Float32(24.8283)
+    beta = Float32(10.9761)
+
 
     model = create_benoit_model(N, W, etta, tau_E, tau_I, w_EE, w_EI, w_IE, beta)
     
@@ -234,17 +230,20 @@ function main_raf()
             end
         end
     end
-    theta_E = [4.1417, 4.1417]
-    theta_I = [-6.19609, -6.19609]
+    theta_E = [-26.5766, -26.5766]
+    theta_I = [15.5643, 15.5643]
     stim = response
     df = run_act_time(model, simulate_benoit_model, range_t, dt, theta_E, theta_I, stim)
 
     #filter = digitalfilter(Bandpass(3.0,7.0),Butterworth(2))
     #df.R[1].rE = filtfilt(filter, df.R[1].rE)
 
-    plot_act_time(df, N)
-    plot_spec(df, N, sampling_rate)
-    plot_hilbert_amplitude_pdf(df.R[1].rE, df.T[1], sampling_rate)
+    #plot_act_time(df, N)
+    #plot_spec(df, N, sampling_rate)
+    #plot_hilbert_amplitude_pdf(df.R[1].rE, df.T[1], sampling_rate)
+
+    run_spec(df.R[1].rE, true)
+    run_hilbert_pdf(df.R[1].rE, true)
 end
 
 function main_byrne()
