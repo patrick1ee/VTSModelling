@@ -1,4 +1,8 @@
-using ApproxFun, CSV, DataFrames, DSP, FFTW, HDF5, Interpolations, LsqFit, NaNStatistics, Plots, StatsBase, Statistics
+include("./Signal.jl")
+
+using ApproxFun, CSV, DataFrames, DSP, FFTW, HDF5, Interpolations, LPVSpectral, LsqFit, NaNStatistics, Plots, StatsBase, Statistics
+
+using .Signal: get_pow_spec, get_hilbert_amplitude_pdf
 
 const SR = 1000  # recording sampling rate in Hz, do not change this
 
@@ -20,7 +24,7 @@ end
 function model(x,p) 
     f = Fun(Chebyshev(Interval(0,50)),p)
     f.(x)
- end
+end
 
 function get_chan_idx(chan_order, chan_name)
     chan_idx = findall(x -> x == chan_name, chan_order.chan_name)
@@ -144,17 +148,22 @@ function return_ref_chan(EEG_LOC, chan_order)
     return EEG_chan, REF_chan
 end
 
-function plot_spec(sig, freqs=Nothing, sampling_rate=1000)
-    if freqs == Nothing 
-        freqs = fftshift(fftfreq(length(sig), sampling_rate))
-    end
-    spec = fftshift(fft(sig .- mean(sig)))
-    #spec_fit = curve_fit(model, freqs, abs.(spec), zeros(5))
-    #fit_fun = Fun(Chebyshev(Interval(0,50)), spec_fit.param)
-    #spec_welch = power(welch_pgram(sig), n=length(freqs))
-    plot(freqs, abs.(spec), xlabel="frequency (Hz)", xlim=(0, +60), xticks=0:10:60, size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
-    
-    savefig("plots/ml_plots/spec.png")
+function run_spec(sig, freqs=Nothing, sampling_rate=1000)
+    freq, power = get_pow_spec(sig, freqs, sampling_rate)
+    plot(freq, power, xlabel="frequency (Hz)", xlim=(6, 14), xticks=6:2:14, size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+    savefig("plots/optim/data/psd.png")
+
+    csv_df = DataFrame(Frequency = freq, PSD = abs.(power))
+    CSV.write("data/psd.csv", csv_df)
+end
+
+function run_hilbert_pdf(signal; bandwidth=0.1)
+    x, y, ha = get_hilbert_amplitude_pdf(signal, bandwidth=bandwidth)
+    plot(x, y, xlabel="amplitude", ylim=(0.0, 2.0), xlim=(0, 1), xticks=0:0.2:1, yticks=0:0.5:2.0, size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+    savefig("plots/optim/data/hpdf.png")
+
+    csv_df = DataFrame(x=x,y=y)
+    CSV.write("data/hpdf.csv", csv_df)
 end
 
 function analyse()
@@ -175,11 +184,11 @@ function analyse()
     WIN_START = 5  # sec
     WIN_END = 75  # sec
 
-    fid = h5open(data_path*"/"*currSubj*"/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1.hdf5", "r")
+    fid = h5open(data_path*"/"*currSubj*"/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_STIM_EC_v1.hdf5", "r")
     data = read(fid["EEG"])
     close(fid)
 
-    CONST_REF_CHAN = "C3_POz"
+    CONST_REF_CHAN = "CP1_local"
     EEG_chan, REF_chan = return_ref_chan(CONST_REF_CHAN, chan_order)
     EEG = data[EEG_chan, :] .- mean([data[i] for i in REF_chan])
     EEG[1] = EEG[2]  # replace the first 0 with the second value
@@ -202,8 +211,9 @@ function analyse()
 
     #data_flt = filt(digitalfilter(responsetype, designmethod), EEG_data)
     data_raw = data_outlierRem
-    plot_spec(data_raw)
-
+    
+    run_spec(data_raw)
+    run_hilbert_pdf(data_raw)
 end
 
 analyse()

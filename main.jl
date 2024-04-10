@@ -2,7 +2,7 @@ include("./BenoitModel.jl")
 include("./ByrneModel.jl")
 include("./RafalModel.jl")
 include("./Stimulation.jl")
-
+include("./Signal.jl")
 include("./Optim.jl")
 
 using ControlSystems, CSV, CurveFit, DataFrames, DSP, FFTW, KernelDensity, LsqFit, NeuralDynamics, Plots, Statistics, StatsBase
@@ -10,6 +10,8 @@ using .RafalModel: create_rafal_model, simulate_rafal_model
 using .BenoitModel: create_benoit_model, simulate_benoit_model
 using .ByrneModel: create_byrne_pop, create_byrne_pop_EI, create_byrne_network, create_if_pop, simulate_if_pop, simulate_byrne_EI_network
 using .Stimulation: create_stimulus, create_stim_response, yousif_transfer
+
+using .Signal: get_hilbert_amplitude_pdf
 
 
 function create_oscill_input(A, f, base, phase, range_t)
@@ -157,18 +159,8 @@ function run_byrne_if(p, simulate, range_t, dt)
     return DataFrame(t=range_t, rVu=rVu)
 end
 
-function hilbert_amplitude_pdf(signal::Array{Float32, 1}; bandwidth=0.1)
-    hilbert_transform = hilbert(signal)
-    hilbert_amp = abs.(hilbert_transform)
-    
-    # Estimate PDF using kernel density estimation
-    U = kde(hilbert_amp, bandwidth=bandwidth)
-    
-    return U.x, U.density, hilbert_amp
-end
-
 function plot_hilbert_amplitude_pdf(signal::Array{Float32, 1},T, sampling_rate, bandwidth=0.1)
-    x, y, ha = hilbert_amplitude_pdf(signal, bandwidth=bandwidth)
+    x, y, ha = get_hilbert_amplitude_pdf(signal, bandwidth=bandwidth)
     plot(x, y, xlabel="amplitude", ylim=(0.0, 1.0), xlim=(0, 6), xticks=0:2:6, yticks=0:0.5:1.0, size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
     savefig("plots/hilbert_amp_pdf.png")
     plot(T, ha, xlabel="Amplitude", ylabel="Amplitude")

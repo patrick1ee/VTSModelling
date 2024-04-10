@@ -142,22 +142,22 @@ function cost_bb(params)
     yPSDdat = psd_df[!, 2]
     yPSDmod = get_PSD(Eproc, xPSD, false)
 
-    hpdf_df = CSV.read("data/hilber-amp-pdf.csv", DataFrame)
+    hpdf_df = CSV.read("data/hilbert-amp-pdf.csv", DataFrame)
     yHPDFdat = hpdf_df[!, 2]
     _, yHPDFmod, ha = get_hilbert_amplitude_pdf(Eproc)
 
-    hpsd_df = CSV.read("data/hilber-psd.csv", DataFrame)
+    #hpsd_df = CSV.read("data/hilbert-psd.csv", DataFrame)
     #yHPSDx = hpsd_df[!, 1]
-    yHPSDdat = hpsd_df[!, 2]
+    #yHPSDdat = hpsd_df[!, 2]
 
-    F_HA = fftshift(fft(ha))
-    yHPSDmod = abs.(F_HA)
+    #F_HA = fftshift(fft(ha))
+    #yHPSDmod = abs.(F_HA)
 
     cost1 = (sum((yPSDdat .- yPSDmod).^2) / sum((yPSDdat .- mean(yPSDdat)).^2)) / 3
     cost2 = (sum((yHPDFdat .- yHPDFmod).^2) / sum((yHPDFdat .- mean(yHPDFdat)).^2)) / 3
-    cost3 = (sum((yHPSDdat .- yHPSDmod).^2) / sum((yHPSDdat .- mean(yHPSDdat)).^2)) / 3
+    #cost3 = (sum((yHPSDdat .- yHPSDmod).^2) / sum((yHPSDdat .- mean(yHPSDdat)).^2)) / 3
 
-    cost = cost1 + cost2 + cost3
+    cost = cost1 + cost2 #+ cost3
 
     filename="costs.txt"
 
