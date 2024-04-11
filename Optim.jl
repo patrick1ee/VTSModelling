@@ -41,12 +41,20 @@ function cost_bb(params)
 
     tau_E = Float32(params[1])
     tau_I = Float32(params[1])
-    w_EE = Float32(params[2])
-    w_EI = Float32(params[3])
-    w_IE = Float32(params[4])
-    beta = Float32(params[5])
-    theta_E_param = Float32(params[6])
-    theta_I_param = Float32(params[7])
+
+    #w_EE = Float32(params[2])
+    #w_EI = Float32(params[3])
+    #w_IE = Float32(params[4])
+    #beta = Float32(params[5])
+    #theta_E_param = Float32(params[6])
+    #theta_I_param = Float32(params[7])
+
+    w_EE = Float32(9.09084)
+    w_EI = Float32(24.6724)
+    w_IE = Float32(23.7999)
+    beta = Float32(0.0892136)
+    theta_E_param = Float32(-24.2169)
+    theta_I_param = Float32(9.29577)
 
     model = create_benoit_model(N, W, etta, tau_E, tau_I, w_EE, w_EI, w_IE, beta)
     
@@ -202,5 +210,6 @@ function rosenbrock2d(x)
     return (1.0 - x[1])^2 + 100.0 * (x[2] - x[1]^2)^2
 end
 
-#p_range=[(0.0, 0.5), (0.0, 30.0), (0.0, 30.0), (0.0, 30.0), (0.0, 30.0), (-30.0, 30.0), (-30.0, 30.0)]
-#res = bboptimize(cost_bb; SearchRange = p_range, NumDimensions = 8)
+#p_range=[(0.0, 0.1), (0.0, 30.0), (0.0, 30.0), (0.0, 30.0), (0.0, 30.0), (-30.0, 30.0), (-30.0, 30.0)]
+#p_range=[(0.0, 0.1)]
+#res = bboptimize(cost_bb; SearchRange = p_range)

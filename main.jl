@@ -189,15 +189,21 @@ function main_raf()
     # Parameters (time in s)
     N=2
     #[0.0147128, 19.451, 19.0874, 24.8283, 10.9761, -26.5766, 15.5643]
+    #[0.0135525, 10.7344, 28.9111, 21.09, 9.30416, -24.7052, 1.16424]
+    #[0.000490727, 29.6002, 29.9636, 18.7491, 22.1327, -0.58056, 28.771]
+    #[0.0208265, 2.0853, 27.2393, 11.0874, 0.349061, -9.00186, -6.28161]
+    #[0.0371499, 8.14398, 28.6796, 23.8907, 0.487599, -1.42008, -3.58852]
+    #[0.0140624, 9.09084, 24.6724, 23.7999, 0.0892136, -24.2169, 9.29577]
     W=[Float32(0.0) Float32(1.0); Float32(1.0) Float32(0.0)]
     etta=Float32(0.5)
-    tau_E = Float32(0.0147128)
-    tau_I = Float32(0.0147128)
-    w_EE = Float32(19.451)
-    w_EI = Float32(19.0874)
-    w_IE = Float32(24.8283)
-    beta = Float32(10.9761)
-
+    tau_E = Float32(0.0143772)
+    tau_I = Float32(0.0143772)
+    w_EE = Float32(9.09084)
+    w_EI = Float32(24.6724)
+    w_IE = Float32(23.7999)
+    beta = Float32(0.0892136)
+    thE = Float32(-24.2169)
+    thI = Float32(9.29577)
 
     model = create_benoit_model(N, W, etta, tau_E, tau_I, w_EE, w_EI, w_IE, beta)
     
@@ -230,8 +236,8 @@ function main_raf()
             end
         end
     end
-    theta_E = [-26.5766, -26.5766]
-    theta_I = [15.5643, 15.5643]
+    theta_E = [thE, thE]
+    theta_I = [thI, thI]
     stim = response
     df = run_act_time(model, simulate_benoit_model, range_t, dt, theta_E, theta_I, stim)
 
@@ -242,8 +248,11 @@ function main_raf()
     #plot_spec(df, N, sampling_rate)
     #plot_hilbert_amplitude_pdf(df.R[1].rE, df.T[1], sampling_rate)
 
-    run_spec(df.R[1].rE, true)
-    run_hilbert_pdf(df.R[1].rE, true)
+    #zscore
+    raw_model_signal = (df.R[1].rE .- mean(df.R[1].rE)) ./ std(df.R[1].rE)
+
+    run_spec(raw_model_signal, true)
+    run_hilbert_pdf(raw_model_signal, true)
 end
 
 function main_byrne()

@@ -1,6 +1,6 @@
 module Signal
 
-    using DSP, FFTW, KernelDensity
+    using DSP, FFTW, KernelDensity, KissSmoothing
 
     export get_pow_spec, get_hilbert_amplitude_pdf
 
@@ -32,13 +32,20 @@ module Signal
         if freqs == Nothing 
             freqs = fftshift(fftfreq(length(sig), sampling_rate))
         end
-        #spec = fftshift(fft(sig .- mean(sig)))
-        spec = welch_pgram(sig; fs=sampling_rate)
+        #spec = fftshift(fft(sig))
+        spec = welch_pgram(sig, fs=sampling_rate)
 
         #spec_fit = curve_fit(model, freqs, abs.(spec), zeros(5))
         #fit_fun = Fun(Chebyshev(Interval(0,50)), spec_fit.param)
         #spec_welch = power(welch_pgram(sig), n=length(freqs))
-        return spec.freq, spec.power
+
+        # Filter out frequencies between 0 and 50
+        mask = (freqs .>= 0) .& (freqs .<= 50)
+        filtered_freqs = spec.freq
+        filtered_spec = spec.power
+
+        S, N = denoise(convert(AbstractArray{Float64}, abs.(filtered_spec)))
+        return filtered_freqs, S
     end
 
     function get_hilbert_amplitude_pdf(signal; bandwidth=0.1)

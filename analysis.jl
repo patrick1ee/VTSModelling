@@ -154,8 +154,7 @@ module analysis
 
     function run_spec(sig, model, freqs=Nothing, sampling_rate=1000)
         freq, power = get_pow_spec(sig, freqs, sampling_rate)
-
-        plot(freq, power, xlabel="frequency (Hz)", xlim=(6, 14), xticks=6:2:14, size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+        plot(freq, power, xlabel="frequency (Hz)", xlim=(0, 14), xticks=0:2:14, size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
         csv_df = DataFrame(Frequency = freq, PSD = abs.(power))
 
         if model
@@ -240,3 +239,5 @@ module analysis
         savefig("plots/optim/data/raw.png")
     end
 end
+
+#analysis.analyse()
