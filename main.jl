@@ -194,16 +194,25 @@ function main_raf()
     #[0.0208265, 2.0853, 27.2393, 11.0874, 0.349061, -9.00186, -6.28161]
     #[0.0371499, 8.14398, 28.6796, 23.8907, 0.487599, -1.42008, -3.58852]
     #[0.0140624, 9.09084, 24.6724, 23.7999, 0.0892136, -24.2169, 9.29577]
+    #[0.0210295, 1.11603, 9.62243, 26.7759, 1.81981, 0.952654, 11.3475]
+    #p = [0.0292394, 8.70738, 19.7852, 26.7454, 19.4352, 8.48873, -18.6168]
+    #[0.0266424, 10.3601, 16.5145, 20.1698, 0.168476, -16.4866, -8.21806]
+    #p = [0.0218115, 0.551917, 3.11244, 13.9572, 15.124, -9.31442, -27.2121]
+    #p = [0.0293204, 7.8674, 19.6515, 26.1374, 19.2606, 8.92379, -18.5011]
+
+    #p = [0.01668432168662548, 2.4, 2.0, 2.0, 4.0, 0.7, 0.0]
+    p = [0.01628074236214161,1.831398606300354,4.525926113128662,7.457535743713379,9.69379711151123,0.6643844246864319,-2.1889257431030273]
+
     W=[Float32(0.0) Float32(1.0); Float32(1.0) Float32(0.0)]
     etta=Float32(0.5)
-    tau_E = Float32(0.0143772)
-    tau_I = Float32(0.0143772)
-    w_EE = Float32(9.09084)
-    w_EI = Float32(24.6724)
-    w_IE = Float32(23.7999)
-    beta = Float32(0.0892136)
-    thE = Float32(-24.2169)
-    thI = Float32(9.29577)
+    tau_E = Float32(p[1])
+    tau_I = Float32(p[1])
+    w_EE = Float32(p[2])
+    w_EI = Float32(p[3])
+    w_IE = Float32(p[4])
+    beta = Float32(p[5])
+    thE = Float32(p[6])
+    thI = Float32(p[7])
 
     model = create_benoit_model(N, W, etta, tau_E, tau_I, w_EE, w_EI, w_IE, beta)
     
@@ -228,14 +237,14 @@ function main_raf()
     #stim=create_stimulus(A, f, range_t)
     #response=create_stim_response(stim, range_t)
     response = fill(0.0, length(range_t)) #yousif_transfer(A, f, range_t)
-    for i in 1:6:T-6
-        #Start pulse
-        for j in 0:24
-            for k in 0:2:10
-                response[Int64(trunc(i*1000+j*200+k*(1000/130)))] = 0.001684
-            end
-        end
-    end
+    #for i in 1:6:T-6
+    #    #Start pulse
+    #    for j in 0:24
+    #        for k in 0:2:10
+    #            response[Int64(trunc(i*1000+j*200+k*(1000/130)))] = 0.001684
+    #        end
+    #    end
+    #end
     theta_E = [thE, thE]
     theta_I = [thI, thI]
     stim = response

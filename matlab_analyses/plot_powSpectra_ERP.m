@@ -214,7 +214,8 @@ for p = 1:numel(Const.participants)
         
             for fn = itFiles
                 % Details on the pwelch function: https://edoras.sdsu.edu/doc/matlab/toolbox/signal/pwelch.html
-                powSpect = pwelch(raw_data_multi(fn,:)',  win, winLength * overlap, POW_SPECTRUM_FREQS, SR, 'psd');    
+                powSpect = pwelch(raw_data_multi(fn,:)',  win, winLength * overlap, 
+                , SR, 'psd');    
                 h(fn) = plot(powSpect, 'LineWidth', 1, 'Color', cols(fn,:)); hold on
                 if fn == 1  % make the black noStim condition line thicker, as it is in the background
                     h(fn) = plot(powSpect, 'LineWidth', 1.5, 'Color', cols(fn,:)); hold on

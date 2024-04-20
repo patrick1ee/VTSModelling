@@ -28,6 +28,18 @@ module Signal
         return arr
     end
 
+    function get_bounds(arr, lb, ub)
+        li = 1
+        while arr[li] < lb
+            li += 1
+        end
+        ui = 1
+        while arr[ui] < ub
+            ui += 1
+        end
+        return li, ui
+    end
+
     function get_pow_spec(sig, freqs=Nothing, sampling_rate=1000)
         if freqs == Nothing 
             freqs = fftshift(fftfreq(length(sig), sampling_rate))
@@ -40,11 +52,13 @@ module Signal
         #spec_welch = power(welch_pgram(sig), n=length(freqs))
 
         # Filter out frequencies between 0 and 50
-        mask = (freqs .>= 0) .& (freqs .<= 50)
-        filtered_freqs = spec.freq
-        filtered_spec = spec.power
+        li, ui = get_bounds(spec.freq, 6, 55)
+        filtered_freqs = spec.freq[li:ui]
+        filtered_spec = spec.power[li:ui]
 
         S, N = denoise(convert(AbstractArray{Float64}, abs.(filtered_spec)))
+        #S = filtered_spec
+        S = S .* 10
         return filtered_freqs, S
     end
 
