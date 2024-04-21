@@ -34,24 +34,20 @@ function run_act_time(m, simulate, range_t, dt, theta_E, theta_I, stim_response)
     return DataFrame(T=T, R=R, theta_E=theta_E_t, theta_I=theta_I_t)
 end
 
-
-params_df = CSV.read("data/params.csv", DataFrame)
 function cost_bb(params)
-
-    row = trunc(Int, params[1])
 
     N=2
     W=[Float32(0.0) Float32(1.0); Float32(1.0) Float32(0.0)]
     etta=Float32(0.5)
 
-    tau_E = Float32(params_df[row, 1])
-    tau_I = Float32(params_df[row, 1])
-    w_EE = Float32(params_df[row, 2])
-    w_EI = Float32(params_df[row, 3])
-    w_IE = Float32(params_df[row, 4])
-    beta = Float32(params_df[row, 5])
-    theta_E_param = Float32(params_df[row, 6])
-    theta_I_param = Float32(params_df[row, 7])
+    tau_E = Float32(params[1])
+    tau_I = Float32(params[1])
+    w_EE = Float32(params[2])
+    w_EI = Float32(params[3])
+    w_IE = Float32(params[4])
+    beta = Float32(params[5])
+    theta_E_param = Float32(params[6])
+    theta_I_param = Float32(params[7])
 
     #w_EE = Float32(9.09084)
     #w_EI = Float32(24.6724)
@@ -62,7 +58,7 @@ function cost_bb(params)
 
     model = create_benoit_model(N, W, etta, tau_E, tau_I, w_EE, w_EI, w_IE, beta)
     
-    T = 100.0
+    T = 10.0
     dt = 0.001
     range_t = 0.0:dt:T
 
@@ -107,17 +103,17 @@ function cost_bb(params)
         yPSDdat = yPSDdat[1:length(yPSDmod)]
     end
 
-    cost1 = (sum((yPSDdat .- yPSDmod).^2) / sum((yPSDdat .- mean(yPSDdat)).^2)) / 2
-    cost2 = (sum((yHPDFdat .- yHPDFmod).^2) / sum((yHPDFdat .- mean(yHPDFdat)).^2)) / 2
+    #cost1 = (sum((yPSDdat .- yPSDmod).^2) / sum((yPSDdat .- mean(yPSDdat)).^2)) / 2
+    cost2 = (sum((yHPDFdat .- yHPDFmod).^2) / sum((yHPDFdat .- mean(yHPDFdat)).^2))
     #cost3 = (sum((yHPSDdat .- yHPSDmod).^2) / sum((yHPSDdat .- mean(yHPSDdat)).^2)) / 3
 
-    cost = cost1 + cost2 #+ cost3
+    cost = cost2 #+ cost3
 
     filename="costs.txt"
 
     if isfile(filename)
         fileID = open(filename, "w")
-        println(fileID, tau_E, tau_I, w_EE, w_EI, w_IE, beta, "::", cost1, "::", cost2)
+        println(fileID, tau_E, tau_I, w_EE, w_EI, w_IE, beta, "::", cost2)
         close(fileID)
     end
 
@@ -143,7 +139,7 @@ function init_param(bounds, NPARAMS=2500)
     peakDat = argmax(yPSDdat)
 
     csv_df_w = DataFrame(tau=[0.0], w_EE=[0.0], w_EI=[0.0], w_IE=[0.0], beta=[0.0], theta_E=[0.0], theta_I=[0.0])
-    CSV.write("data/params.csv", csv_df_w)
+    CSV.write("data/params-1.csv", csv_df_w)
 
     count = 0
 
@@ -183,11 +179,12 @@ function init_param(bounds, NPARAMS=2500)
 
         if abs(xPSD[peakDat] - freq[peakMod]) <= 1.0 && abs(yPSDmod[peakMod] - yPSDdat[peakDat]) <= 0.25*yPSDdat[peakDat]
             new_row = (tau=tau_p, w_EE=w_EE_p, w_EI=w_EI_p, w_IE=w_IE_p, beta=beta_p, theta_E=theta_E_p, theta_I=theta_I_p)
-            df_csv_r = CSV.read("data/params.csv", DataFrame)
+            df_csv_r = CSV.read("data/params-1.csv", DataFrame)
             push!(df_csv_r, new_row)
-            CSV.write("data/params.csv", df_csv_r)
+            CSV.write("data/params-1.csv", df_csv_r)
             count += 1
             print("Added " * string(count) * " / 2500 parameters\n")
+            print("pmidx: " * string(peakMod) * "pdidx: " * string(peakDat) * "peak mod: " * string(freq[peakMod]) * " peak dat: " * string(xPSD[peakDat]) * " diff: " * string(abs(xPSD[peakDat] - freq[peakMod])) * " " * string(abs(yPSDmod[peakMod] - yPSDdat[peakDat])) * " " * string(0.25*yPSDdat[peakDat]) * "\n")
         else
             #print("Rejected " * string(tau_p) * " " * string(w_EE_p) * " " * string(w_EI_p) * " " * string(w_IE_p) * " " * string(beta_p) * " " * string(theta_E_p) * " " * string(theta_I_p) * " -> " * string(abs(xPSD[peakDat] - xPSD[peakMod])) * "\n")
         end
@@ -285,7 +282,17 @@ end
 #p_range=[(1.0, 2501.0)]
 #res = bboptimize(cost_bb, SearchRange=p_range)
 
-p_bounds = [(0.016, 0.017), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (-2.0, 10.0), (-10.0, 2.0)]
-init_param(p_bounds)
-opt_param()
+#p_bounds = [(0.016, 0.017), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (-2.0, 10.0), (-10.0, 2.0)]
+#init_param(p_bounds)
+#opt_param()
 
+df_csv_r = CSV.read("data/params.csv", DataFrame)
+V = []
+for (i, row) in enumerate(eachrow(df_csv_r))
+    push!(V, [v for v in values(df_csv_r[i,:])])
+end
+
+good_guess = [0.016324788331985474,8.401309967041016,6.917157173156738,9.229533195495605,4.105310916900635,0.19816090166568756,-1.3066587448120117]
+p_range = [(0.016, 0.017), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (-2.0, 10.0), (-10.0, 2.0)]
+
+#res = bboptimize(cost_bb, good_guess, SearchRange=p_range, MaxSteps=100000)
