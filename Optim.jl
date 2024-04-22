@@ -1,7 +1,7 @@
 include("./BenoitModel.jl")
 include("./Signal.jl")
 
-using BlackBoxOptim, CSV, DataFrames, Distributions, DSP, FFTW, KernelDensity, Plots, Statistics
+using BlackBoxOptim, CSV, DataFrames, Distributions, DSP, FFTW, KernelDensity, Optimization, OptimizationCMAEvolutionStrategy, Plots, Statistics
 
 using .BenoitModel: create_benoit_model, simulate_benoit_model
 using .Signal: get_pow_spec, get_hilbert_amplitude_pdf
@@ -34,7 +34,7 @@ function run_act_time(m, simulate, range_t, dt, theta_E, theta_I, stim_response)
     return DataFrame(T=T, R=R, theta_E=theta_E_t, theta_I=theta_I_t)
 end
 
-function cost_bb(params)
+function cost_bb(params, p)
 
     N=2
     W=[Float32(0.0) Float32(1.0); Float32(1.0) Float32(0.0)]
@@ -103,17 +103,17 @@ function cost_bb(params)
         yPSDdat = yPSDdat[1:length(yPSDmod)]
     end
 
-    #cost1 = (sum((yPSDdat .- yPSDmod).^2) / sum((yPSDdat .- mean(yPSDdat)).^2)) / 2
-    cost2 = (sum((yHPDFdat .- yHPDFmod).^2) / sum((yHPDFdat .- mean(yHPDFdat)).^2))
+    cost1 = 0 #(sum((yPSDdat .- yPSDmod).^2) / sum((yPSDdat .- mean(yPSDdat)).^2)) / 2
+    cost2 = (sum((yHPDFdat .- yHPDFmod).^2) / sum((yHPDFdat .- mean(yHPDFdat)).^2)) / 1
     #cost3 = (sum((yHPSDdat .- yHPSDmod).^2) / sum((yHPSDdat .- mean(yHPSDdat)).^2)) / 3
 
-    cost = cost2 #+ cost3
+    cost = cost1 + cost2 #+ cost3
 
     filename="costs.txt"
 
     if isfile(filename)
         fileID = open(filename, "w")
-        println(fileID, tau_E, tau_I, w_EE, w_EI, w_IE, beta, "::", cost2)
+        println(fileID, tau_E, tau_I, w_EE, w_EI, w_IE, beta, "::", cost1, "::", cost2)
         close(fileID)
     end
 
@@ -261,13 +261,15 @@ end
 end=#
 
 function opt_param()
-    best_param = 1
+    best_param = []
     best_cost = 1000.0
-    for i in 1:2500
-        cost = cost_bb([i])
+    df_csv_r = CSV.read("data/params.csv", DataFrame)
+    for (i, row) in enumerate(eachrow(df_csv_r))
+        p = [v for v in values(df_csv_r[i,:])]
+        cost = cost_bb(p, NaN)
         if cost < best_cost
             best_cost = cost
-            best_param = i
+            best_param = p
             println("Best cost: ", best_cost, " Best param: ", best_param)
         end
     end
@@ -277,22 +279,35 @@ function rosenbrock2d(x)
     return (1.0 - x[1])^2 + 100.0 * (x[2] - x[1]^2)^2
 end
 
-#p_range=[[0.0, 0.1, 0.6], (0.0, 30.0), (0.0, 30.0), (0.0, 30.0), (0.0, 30.0), (-30.0, 30.0), (-30.0, 30.0)]
-#p_range = [(0.028, 0.030 ), (7.0, 9.0), (18.0, 20.0), (26.0, 28.0), (18.0, 20.0), (8.0, 9.0), (-20.0, -18.0)]
-#p_range=[(1.0, 2501.0)]
-#res = bboptimize(cost_bb, SearchRange=p_range)
+function Optim()
+    #p_range=[[0.0, 0.1, 0.6], (0.0, 30.0), (0.0, 30.0), (0.0, 30.0), (0.0, 30.0), (-30.0, 30.0), (-30.0, 30.0)]
+    #p_range = [(0.028, 0.030 ), (7.0, 9.0), (18.0, 20.0), (26.0, 28.0), (18.0, 20.0), (8.0, 9.0), (-20.0, -18.0)]
+    #p_range=[(1.0, 2501.0)]
+    #res = bboptimize(cost_bb, SearchRange=p_range)
 
-#p_bounds = [(0.016, 0.017), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (-2.0, 10.0), (-10.0, 2.0)]
-#init_param(p_bounds)
-#opt_param()
+    #p_bounds = [(0.016, 0.017), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (-2.0, 10.0), (-10.0, 2.0)]
+    #init_param(p_bounds)
+    #opt_param()
 
-df_csv_r = CSV.read("data/params.csv", DataFrame)
-V = []
-for (i, row) in enumerate(eachrow(df_csv_r))
-    push!(V, [v for v in values(df_csv_r[i,:])])
+    df_csv_r = CSV.read("data/params.csv", DataFrame)
+    V = []
+    for (i, row) in enumerate(eachrow(df_csv_r))
+        push!(V, [v for v in values(df_csv_r[i,:])])
+    end
+
+    good_guess = [0.016324788331985474,8.401309967041016,6.917157173156738,9.229533195495605,4.105310916900635,0.19816090166568756,-1.3066587448120117]
+    #p_range = [(0.016, 0.017), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (-2.0, 10.0), (-10.0, 2.0)]
+    p_range=[(0.0, 0.5), (0.0, 30.0), (0.0, 30.0), (0.0, 30.0), (0.0, 30.0), (-30.0, 30.0), (-30.0, 30.0)]
+
+    #res = bboptimize(cost_bb, good_guess, SearchRange=p_range, MaxSteps=100000)
+
+    lb = [0.0, 0.0, 0.0, 0.0, 0.0, -30.0, -30.0]
+    ub = [0.5, 30.0, 30.0, 30.0, 30.0, 30.0, 30.0]
+    f = OptimizationFunction(cost_bb)
+    prob = Optimization.OptimizationProblem(f, good_guess; lb=lb, ub=ub)
+    sol = solve(prob, CMAEvolutionStrategyOpt())
+    println(sol)
 end
 
-good_guess = [0.016324788331985474,8.401309967041016,6.917157173156738,9.229533195495605,4.105310916900635,0.19816090166568756,-1.3066587448120117]
-p_range = [(0.016, 0.017), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (-2.0, 10.0), (-10.0, 2.0)]
+#opt_param()
 
-#res = bboptimize(cost_bb, good_guess, SearchRange=p_range, MaxSteps=100000)
