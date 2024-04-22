@@ -13,9 +13,9 @@ using .BenoitModel: create_benoit_model, simulate_benoit_model
 using .ByrneModel: create_byrne_pop, create_byrne_pop_EI, create_byrne_network, create_if_pop, simulate_if_pop, simulate_byrne_EI_network
 using .Stimulation: create_stimulus, create_stim_response, yousif_transfer
 
-using .Signal: get_pow_spec, get_hilbert_amplitude_pdf
+using .Signal: get_pow_spec, get_hilbert_amplitude_pdf, get_beta_data
 
-using .analysis: run_spec, run_hilbert_pdf
+using .analysis: run_spec, run_hilbert_pdf, run_beta_burst
 
 
 function create_oscill_input(A, f, base, phase, range_t)
@@ -92,6 +92,48 @@ end
 function plot_avg_if_activity(df)
     plot(df.t, df.rVu, xlabel="t", ylabel="V")
     savefig("plots/myplot.png")
+end
+
+function plot_data_model_features()
+    # Load data
+    df_psd_data = CSV.read("data/psd.csv", DataFrame)   
+    df_psd_model = CSV.read("data/psd-m.csv", DataFrame)
+    df_beta_amp_pdf_data = CSV.read("data/beta-hpdf.csv", DataFrame)
+    df_beta_amp_pdf_model = CSV.read("data/beta-hpdf-m.csv", DataFrame)
+    df_beta_dur_pdf_data = CSV.read("data/beta-dur-hpdf.csv", DataFrame)
+    df_beta_dur_pdf_model = CSV.read("data/beta-dur-pdf-m.csv", DataFrame)
+
+    plot(
+        df_beta_amp_pdf_data[!, 1],
+        [df_beta_amp_pdf_data[!, 2], df_beta_amp_pdf_model[!, 2]],
+        xlabel="frequency (Hz)",
+        size=(500,500),
+        linewidth=3, 
+        xtickfont=16,
+        ytickfont=16,
+        legend=false,
+        titlefont=16, 
+        guidefont=16,
+        tickfont=16,
+        legendfont=16
+    )
+    savefig("plots/optim/comb/beta-amp-pdf.png")
+
+    plot(
+        df_beta_dur_pdf_data[!, 1],
+        [df_beta_dur_pdf_data[!, 2], df_beta_dur_pdf_model[!, 2]],
+        xlabel="duration (s)",
+        size=(500,500),
+        linewidth=3, 
+        xtickfont=16,
+        ytickfont=16,
+        legend=false,
+        titlefont=16, 
+        guidefont=16,
+        tickfont=16,
+        legendfont=16
+    )
+    savefig("plots/optim/comb/beta-dur-pdf.png")
 end
 
 function run_max_min(m, simulate, range_t, dt, range_theta_input, theta_const, input_pop)
@@ -184,7 +226,6 @@ function plot_hilbert_amplitude_pdf(signal::Array{Float32, 1},T, sampling_rate, 
 
 end
 
-
 function main_raf()
     # Parameters (time in s)
     N=2
@@ -206,7 +247,9 @@ function main_raf()
     #p = [0.0160626, 1.6523, 6.5157, 6.27421, 7.2687, 0.473071, -8.26678] # Opt to just hpdf
     #p = [0.01639675162732601, 1.6523, 6.5157, 6.27421, 7.2687, 10.5473071, 0.0]
 
-    p = [0.016329117119312286, 3.9730966091156006, 2.6395351886749268, 6.608642578125, 3.699204444885254, 0.35007891058921814, -0.09347619861364365]
+    #p = [0.016329117119312286, 3.9730966091156006, 2.6395351886749268, 6.608642578125, 3.699204444885254, 0.35007891058921814, -0.09347619861364365]
+    #p = [0.0163153, 8.4994, 22.1685, 17.0323, 27.1569, 7.88831, -20.8976]
+    p = [0.016624921932816505, 4.1515889167785645, 5.530158519744873, 9.802279472351074, 3.491934299468994, 0.16449561715126038, -0.7124000191688538]
 
     W=[Float32(0.0) Float32(1.0); Float32(1.0) Float32(0.0)]
     etta=Float32(0.5)
@@ -221,7 +264,7 @@ function main_raf()
 
     model = create_benoit_model(N, W, etta, tau_E, tau_I, w_EE, w_EI, w_IE, beta)
     
-    T = 10.0
+    T = 100.0
     dt = 0.001
     range_t = 0.0:dt:T
     sampling_rate = 1.0 / dt
@@ -263,10 +306,23 @@ function main_raf()
     #plot_hilbert_amplitude_pdf(df.R[1].rE, df.T[1], sampling_rate)
 
     #zscore
-    raw_model_signal = (df.R[1].rE .- mean(df.R[1].rE)) ./ std(df.R[1].rE)
+    cut_model_signal = df.R[1].rE[100:end]
+    raw_model_signal = (cut_model_signal .- mean(cut_model_signal)) ./ std(cut_model_signal)
+    model_flt_beta = get_beta_data(cut_model_signal)
+    model_flt_beta = (model_flt_beta .- mean(model_flt_beta)) ./ std(model_flt_beta)
 
-    run_spec(raw_model_signal, true)
+    df_psd_data = CSV.read("data/psd.csv", DataFrame)   
+
+    run_spec(raw_model_signal, true, df_psd_data[!, 1])
     run_hilbert_pdf(raw_model_signal, true)
+
+    run_beta_burst(model_flt_beta, true)
+
+    plot(1:length(raw_model_signal), raw_model_signal, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+    savefig("plots/optim/model/raw.png")
+
+    plot(1:length(model_flt_beta), model_flt_beta, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+    savefig("plots/optim/model/flt_beta.png")
 end
 
 function main_byrne()
@@ -316,5 +372,5 @@ function main_stim()
     savefig("plot2.png")
 end
 
-main_raf()
-
+#main_raf()
+plot_data_model_features()

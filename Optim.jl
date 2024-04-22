@@ -1,10 +1,10 @@
 include("./BenoitModel.jl")
 include("./Signal.jl")
 
-using BlackBoxOptim, CSV, DataFrames, Distributions, DSP, FFTW, KernelDensity, Optimization, OptimizationCMAEvolutionStrategy, Plots, Statistics
+using BlackBoxOptim, CSV, DataFrames, Distributions, DSP, FFTW, KernelDensity, KissSmoothing, Optimization, OptimizationCMAEvolutionStrategy, Plots, Statistics
 
 using .BenoitModel: create_benoit_model, simulate_benoit_model
-using .Signal: get_pow_spec, get_hilbert_amplitude_pdf
+using .Signal: get_beta_data, get_pow_spec, get_hilbert_amplitude_pdf, get_burst_durations
 
 const SR = 1000  # recording sampling rate in Hz, do not change this
 
@@ -34,7 +34,8 @@ function run_act_time(m, simulate, range_t, dt, theta_E, theta_I, stim_response)
     return DataFrame(T=T, R=R, theta_E=theta_E_t, theta_I=theta_I_t)
 end
 
-function cost_bb(params, p)
+function cost_bb(params)
+    SR = 1000
 
     N=2
     W=[Float32(0.0) Float32(1.0); Float32(1.0) Float32(0.0)]
@@ -58,7 +59,7 @@ function cost_bb(params, p)
 
     model = create_benoit_model(N, W, etta, tau_E, tau_I, w_EE, w_EI, w_IE, beta)
     
-    T = 10.0
+    T = 100.0
     dt = 0.001
     range_t = 0.0:dt:T
 
@@ -80,40 +81,49 @@ function cost_bb(params, p)
 
     #zscore
     Eproc = df.R[1].rE .- mean(df.R[1].rE) / std(df.R[1].rE)
+    Ebeta = get_beta_data(df.R[1].rE)
+    Ebeta = Ebeta .- mean(Ebeta) / std(Ebeta)
 
     psd_df = CSV.read("data/psd.csv", DataFrame)
     xPSD = psd_df[!, 1]
     yPSDdat = psd_df[!, 2]
     freq, yPSDmod = get_pow_spec(Eproc, xPSD, SR)
 
-    hpdf_df = CSV.read("data/hpdf.csv", DataFrame)
-    yHPDFdat = hpdf_df[!, 2]
-    _, yHPDFmod, ha = get_hilbert_amplitude_pdf(Eproc)
+    beta_amp_pdf_df = CSV.read("data/beta-hpdf.csv", DataFrame)
+    yBAPDFdat = beta_amp_pdf_df[!, 2]
+    _, yBAPDFmod, Ebeta_ha = get_hilbert_amplitude_pdf(Ebeta)
 
-    #hpsd_df = CSV.read("data/hilbert-psd.csv", DataFrame)
-    #yHPSDx = hpsd_df[!, 1]
-    #yHPSDdat = hpsd_df[!, 2]
+    beta_dur_pdf_df = CSV.read("data/beta-dur-hpdf.csv", DataFrame)
+    yBDPDFdat = beta_dur_pdf_df[!, 2]
+    _, yBDPDFmod, _ = get_burst_durations(Ebeta_ha)
 
-    #F_HA = fftshift(fft(ha))
-    #yHPSDmod = abs.(F_HA)
 
     if length(yPSDmod) > length(yPSDdat)
         yPSDmod = yPSDmod[1:length(yPSDdat)]
     elseif length(yPSDmod) < length(yPSDdat)
         yPSDdat = yPSDdat[1:length(yPSDmod)]
     end
+    
+    cost1 = 1.0
+    cost2 = 1.0
+    cost3 = 1.0
 
-    cost1 = 0 #(sum((yPSDdat .- yPSDmod).^2) / sum((yPSDdat .- mean(yPSDdat)).^2)) / 2
-    cost2 = (sum((yHPDFdat .- yHPDFmod).^2) / sum((yHPDFdat .- mean(yHPDFdat)).^2)) / 1
-    #cost3 = (sum((yHPSDdat .- yHPSDmod).^2) / sum((yHPSDdat .- mean(yHPSDdat)).^2)) / 3
+    cost1 = (sum((yPSDdat .- yPSDmod).^2) / sum((yPSDdat .- mean(yPSDdat)).^2)) / 3
 
-    cost = cost1 + cost2 #+ cost3
+    if length(yBAPDFmod) > 0
+        cost2 = (sum((yBAPDFdat .- yBAPDFmod).^2) / sum((yBAPDFdat .- mean(yBAPDFdat)).^2)) / 3
+    end
+    if length(yBDPDFmod) > 0
+        cost3 = (sum((yBDPDFdat .- yBDPDFmod).^2) / sum((yBDPDFdat .- mean(yBDPDFdat)).^2)) / 3
+    end
+
+    cost = cost1 + cost2 + cost3
 
     filename="costs.txt"
 
     if isfile(filename)
         fileID = open(filename, "w")
-        println(fileID, tau_E, tau_I, w_EE, w_EI, w_IE, beta, "::", cost1, "::", cost2)
+        println(fileID, tau_E, tau_I, w_EE, w_EI, w_IE, beta, "::", cost1, "::", cost2, "::", cost3, "\n")
         close(fileID)
     end
 
@@ -266,7 +276,7 @@ function opt_param()
     df_csv_r = CSV.read("data/params.csv", DataFrame)
     for (i, row) in enumerate(eachrow(df_csv_r))
         p = [v for v in values(df_csv_r[i,:])]
-        cost = cost_bb(p, NaN)
+        cost = cost_bb(p)
         if cost < best_cost
             best_cost = cost
             best_param = p
@@ -280,10 +290,10 @@ function rosenbrock2d(x)
 end
 
 function Optim()
-    #p_range=[[0.0, 0.1, 0.6], (0.0, 30.0), (0.0, 30.0), (0.0, 30.0), (0.0, 30.0), (-30.0, 30.0), (-30.0, 30.0)]
-    #p_range = [(0.028, 0.030 ), (7.0, 9.0), (18.0, 20.0), (26.0, 28.0), (18.0, 20.0), (8.0, 9.0), (-20.0, -18.0)]
-    #p_range=[(1.0, 2501.0)]
-    #res = bboptimize(cost_bb, SearchRange=p_range)
+    p_range=[(0.016, 0.017), (0.0, 30.0), (0.0, 30.0), (0.0, 30.0), (0.0, 30.0), (-30.0, 30.0), (-30.0, 30.0)]
+    good_guess = [0.016324788331985474,8.401309967041016,6.917157173156738,9.229533195495605,4.105310916900635,0.19816090166568756,-1.3066587448120117]
+    res = bboptimize(cost_bb, good_guess, SearchRange=p_range)
+    return
 
     #p_bounds = [(0.016, 0.017), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (-2.0, 10.0), (-10.0, 2.0)]
     #init_param(p_bounds)
@@ -310,4 +320,4 @@ function Optim()
 end
 
 #opt_param()
-
+#Optim()

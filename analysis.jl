@@ -2,13 +2,13 @@ module analysis
 
     include("./Signal.jl")
 
-    using ApproxFun, CSV, DataFrames, DSP, FFTW, HDF5, Interpolations, LPVSpectral, LsqFit, NaNStatistics, Plots, StatsBase, Statistics
+    using ApproxFun, CSV, DataFrames, DSP, FFTW, HDF5, Interpolations, KissSmoothing, LPVSpectral, LsqFit, NaNStatistics, Plots, StatsBase, Statistics
 
-    using .Signal: get_pow_spec, get_hilbert_amplitude_pdf
+    using .Signal: get_beta_data, get_pow_spec, get_hilbert_amplitude_pdf, get_burst_durations
 
     const SR = 1000  # recording sampling rate in Hz, do not change this
 
-    export run_spec, run_hilbert_pdf
+    export run_spec, run_hilbert_pdf, run_beta_burst
 
     function interpolate_nan(arr)
         Larr = length(arr)
@@ -152,6 +152,15 @@ module analysis
         return EEG_chan, REF_chan
     end
 
+    function run_beta_data(sig)
+        data_flt_beta = get_beta_data(sig)
+
+        freq, power = get_pow_spec(data_flt_beta)
+        plot(freq, power, xlabel="frequency (Hz)", xlim=(6, 55), xticks=6:4:55, size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+        savefig("plots/optim/data/beta-psd.png")
+        return data_flt_beta
+    end
+
     function run_spec(sig, model, freqs=Nothing, sampling_rate=1000)
         freq, power = get_pow_spec(sig, freqs, sampling_rate)
         plot(freq, power, xlabel="frequency (Hz)", xlim=(6, 55), xticks=6:4:55, size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
@@ -182,6 +191,45 @@ module analysis
 
     end
 
+    function run_beta_burst(signal, model, bandwidth=0.1)
+        x, y, ha = get_hilbert_amplitude_pdf(signal, bandwidth=bandwidth)
+        S, N = denoise(convert(AbstractArray{Float64}, ha))
+
+        plot(x, y, xlabel="amplitude", ylim=(0.0, 2.0), xlim=(0, 6), xticks=0:2:6, yticks=0:0.5:2.0, size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+        csv_df = DataFrame(x=x,y=y)
+        
+        if model
+            savefig("plots/optim/model/beta-hpdf.png")
+            CSV.write("data/beta-hpdf-m.csv", csv_df)
+        else 
+            savefig("plots/optim/data/beta-hpdf.png")
+            CSV.write("data/beta-hpdf.csv", csv_df)
+        end
+
+        plot(1:length(signal), S, xlabel="time", size=(500,500), xlim=(0, 10000), xticks=0:2000:1000, linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+        csv_df = DataFrame(x=1:length(signal),y=S)
+        
+        if model
+            savefig("plots/optim/model/beta-hamp.png")
+            CSV.write("data/beta-hamp-m.csv", csv_df)
+        else 
+            savefig("plots/optim/data/beta-hamp.png")
+            CSV.write("data/beta-hamp.csv", csv_df)
+        end
+
+        bx, by, burst_durations = get_burst_durations(S)
+        plot(bx, by, xlabel="duration", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+        csv_df = DataFrame(x=bx,y=by)
+        
+        if model
+            savefig("plots/optim/model/beta-dur-pdf.png")
+            CSV.write("data/beta-dur-pdf-m.csv", csv_df)
+        else 
+            savefig("plots/optim/data/beta-dur-pdf.png")
+            CSV.write("data/beta-dur-hpdf.csv", csv_df)
+        end
+    end
+
     function analyse()
         data_path = "Patrick_data"
         chan_order = CSV.read("matlab_analyses/EEG_channel_order.csv", DataFrame)
@@ -192,9 +240,6 @@ module analysis
         ERP_LOWPASS_FILTER = 30  # set to nan if you want to deactivate it
 
         POW_SPECTRUM_FREQS = 6:55  # in Hz
-
-        # Do not change these parameters
-        FLT_ORDER = 2
 
         currSubj = "P20"
         WIN_START = 5  # sec
@@ -222,22 +267,25 @@ module analysis
         data_outlierRem[abs.(med_abs_dev_scores) .> OUTL_THRESHOLD] .= NaN
         data_outlierRem = interpolate_nan(data_outlierRem)
 
-        responsetype = Lowpass(ERP_LOWPASS_FILTER; fs=SR)
-        designmethod = Butterworth(FLT_ORDER)
-
-        data_flt = filt(digitalfilter(responsetype, designmethod), EEG_data)
+        data_flt_beta = get_beta_data(data_outlierRem)
         data_raw = data_outlierRem
 
         #zscore
         data_raw = (data_raw .- mean(data_raw)) ./ std(data_raw)
+        data_flt_beta = (data_flt_beta .- mean(data_flt_beta)) ./ std(data_flt_beta)
         
         run_spec(data_raw, false)
         run_hilbert_pdf(data_raw, false)
 
+        run_beta_burst(data_flt_beta, false)
+
         #plot(1:100, data_raw[1:1:100], xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
         plot(1:length(data_raw), data_raw, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
         savefig("plots/optim/data/raw.png")
+
+        plot(1:length(data_flt_beta), data_flt_beta, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+        savefig("plots/optim/data/flt_beta.png")
     end
 end
 
-#analysis.analyse()
+analysis.analyse()

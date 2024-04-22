@@ -2,7 +2,7 @@ module Signal
 
     using DSP, FFTW, KernelDensity, KissSmoothing
 
-    export get_pow_spec, get_hilbert_amplitude_pdf
+    export get_beta_data, get_pow_spec, get_hilbert_amplitude_pdf, get_burst_durations
 
     function interpolate_nan(arr)
         Larr = length(arr)
@@ -40,6 +40,30 @@ module Signal
         return li, ui
     end
 
+    function get_beta_data(sig, width=6.0)
+        FLT_ORDER = 2
+        LOW_FREQ = 13.0
+        HIGH_FREQ = 35.0
+        SR = 1000
+
+        freq, power = get_pow_spec(sig)
+        freqSize = length(freq)
+        peak_freq = 0.0
+        peak_spec = 0.0
+        for i in 1:freqSize
+            if freq[i] >= LOW_FREQ && freq[i] <= HIGH_FREQ && power[i] > peak_spec
+                peak_freq = freq[i]
+                peak_spec = power[i]
+            end
+        end
+
+        responsetype = Bandpass(peak_freq - (width / 2.0), peak_freq + (width / 2.0); fs=SR)
+        designmethod = Butterworth(FLT_ORDER)
+        data_flt_beta = filt(digitalfilter(responsetype, designmethod), sig)
+
+        return data_flt_beta
+    end
+
     function get_pow_spec(sig, freqs=Nothing, sampling_rate=1000)
         if freqs == Nothing 
             freqs = fftshift(fftfreq(length(sig), sampling_rate))
@@ -75,6 +99,43 @@ module Signal
         catch err
             println("Error: ", err)
             println("Data: ", hilbert_amp)
+            return [], [], []
+        end
+    end
+
+    function get_burst_durations(signal, threshold=0.5)
+        burst_durations = []
+        burst_start = 0
+        burst_end = 0
+        burst_duration = 0 #ms
+        burst = false
+        signalSize = length(signal)
+        for i in 1:signalSize
+            if signal[i] >= threshold
+                if !burst
+                    burst_start = i
+                    burst = true
+                else
+                    burst_duration += 1
+                end
+            else
+                if burst && burst_duration >= 100
+                    burst_end = i
+                    push!(burst_durations, burst_duration)
+                    burst = false
+                end
+                burst_duration = 0
+            end
+        end
+
+        burst_durations = burst_durations ./ 1000
+
+        try
+            U = kde(burst_durations)
+            return U.x, U.density, burst_duration
+        catch err
+            println("Error: ", err)
+            println("Data: ", burst_duration)
             return [], [], []
         end
     end
