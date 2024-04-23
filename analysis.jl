@@ -4,7 +4,7 @@ module analysis
 
     using ApproxFun, CSV, DataFrames, DSP, FFTW, HDF5, Interpolations, KissSmoothing, LPVSpectral, LsqFit, NaNStatistics, Plots, StatsBase, Statistics
 
-    using .Signal: get_beta_data, get_pow_spec, get_hilbert_amplitude_pdf, get_burst_durations
+    using .Signal: get_bandpassed_signal, get_beta_data, get_pow_spec, get_hilbert_amplitude_pdf, get_burst_durations, get_signal_phase
 
     const SR = 1000  # recording sampling rate in Hz, do not change this
 
@@ -231,26 +231,58 @@ module analysis
         end
     end
 
-    function analyse()
-        data_path = "Patrick_data"
+    function run_plv(s1, s2, model)
+        plvs = []
+        freqs = 6:55
+        for f in freqs
+            s1f = get_bandpassed_signal(s1, f-0.5, f+0.5)
+            s2f = get_bandpassed_signal(s2, f-0.5, f+0.5)
+            p1f = get_signal_phase(s1f)
+            p2f = get_signal_phase(s2f)
+            plv = abs(mean(exp.(1im*(p1f .- p2f))))
+            push!(plvs, plv)
+        end
+
+        p1 = get_signal_phase(s1)
+        p2 = get_signal_phase(s2)
+        
+        plot(1:length(s1), p1)
+        csv_df = DataFrame(x=1:length(s1),y=p1)
+        if model
+            savefig("plots/optim/model/phase-1.png")
+            CSV.write("data/phase-1-m.csv", csv_df)
+        else 
+            savefig("plots/optim/data/phase-1.png")
+            CSV.write("data/phase-1.csv", csv_df)
+        end
+
+        plot(1:length(s2), p2)
+        csv_df = DataFrame(x=1:length(s1),y=p2)
+        if model
+            savefig("plots/optim/model/phase-2.png")
+            CSV.write("data/phase-1-m.csv", csv_df)
+        else 
+            savefig("plots/optim/data/phase-2.png")
+            CSV.write("data/phase-1.csv", csv_df)
+        end
+
+        plot(freqs, plvs)
+        csv_df = DataFrame(Frequency = freqs, PLV = plvs)
+        if model
+            savefig("plots/optim/model/plvs.png")
+            CSV.write("data/plvs-m.csv", csv_df)
+        else 
+            savefig("plots/optim/data/plvs.png")
+            CSV.write("data/plvs.csv", csv_df)
+        end
+
+    end
+
+    function parse_eeg_data(data, CONST_REF_CHAN)
         chan_order = CSV.read("matlab_analyses/EEG_channel_order.csv", DataFrame)
-
-        # Define the size of the time-window for computing the ERP (event-related potential)
-        ERP_tWidth = 1  # [sec]
-        ERP_tOffset = ERP_tWidth / 2  # [sec]
-        ERP_LOWPASS_FILTER = 30  # set to nan if you want to deactivate it
-
-        POW_SPECTRUM_FREQS = 6:55  # in Hz
-
-        currSubj = "P20"
         WIN_START = 5  # sec
         WIN_END = 75  # sec
 
-        fid = h5open(data_path*"/"*currSubj*"/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1.hdf5", "r")
-        data = read(fid["EEG"])
-        close(fid)
-
-        CONST_REF_CHAN = "CP1_local"
         EEG_chan, REF_chan = return_ref_chan(CONST_REF_CHAN, chan_order)
         EEG = data[EEG_chan, :] .- mean([data[i] for i in REF_chan])
         EEG[1] = EEG[2]  # replace the first 0 with the second value
@@ -268,12 +300,40 @@ module analysis
         data_outlierRem[abs.(med_abs_dev_scores) .> OUTL_THRESHOLD] .= NaN
         data_outlierRem = interpolate_nan(data_outlierRem)
 
+        return data_outlierRem
+    end
+
+    function analyse()
+        data_path = "Patrick_data"
+
+        # Define the size of the time-window for computing the ERP (event-related potential)
+        ERP_tWidth = 1  # [sec]
+        ERP_tOffset = ERP_tWidth / 2  # [sec]
+        ERP_LOWPASS_FILTER = 30  # set to nan if you want to deactivate it
+
+        POW_SPECTRUM_FREQS = 6:55  # in Hz
+
+        currSubj = "P20"
+
+        fid = h5open(data_path*"/"*currSubj*"/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1.hdf5", "r")
+        data = read(fid["EEG"])
+        close(fid)
+
+        CONST_REF_CHAN = "CP1_local"
+        CONST_ALT_CHAN = "CP2_local"
+
+        data_outlierRem = parse_eeg_data(data, CONST_REF_CHAN)
+        data_outlierRem_alt = parse_eeg_data(data, CONST_ALT_CHAN)
+
         data_flt_beta = get_beta_data(data_outlierRem)
         data_raw = data_outlierRem
+        data_raw_alt = data_outlierRem_alt
 
         #zscore
         data_raw = (data_raw .- mean(data_raw)) ./ std(data_raw)
         data_flt_beta = (data_flt_beta .- mean(data_flt_beta)) ./ std(data_flt_beta)
+
+        data_raw_alt = (data_raw_alt .- mean(data_raw_alt)) ./ std(data_raw_alt)
         
         run_spec(data_raw, false)
         run_hilbert_pdf(data_raw, false)
@@ -286,7 +346,9 @@ module analysis
 
         plot(1:length(data_flt_beta), data_flt_beta, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
         savefig("plots/optim/data/flt_beta.png")
+
+        run_plv(data_raw, data_raw_alt, false)
     end
 end
 
-#analysis.analyse()
+analysis.analyse()

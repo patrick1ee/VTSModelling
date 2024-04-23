@@ -1,8 +1,10 @@
 module Signal
 
+    include("./Oscilltrack.jl")
+    using .Oscilltrack: Oscilltracker, update!, get_phase
     using DSP, FFTW, KernelDensity, KissSmoothing
 
-    export get_beta_data, get_pow_spec, get_hilbert_amplitude_pdf, get_burst_durations
+    export get_bandpassed_signal, get_beta_data, get_pow_spec, get_hilbert_amplitude_pdf, get_burst_durations, get_signal_phase
 
     function interpolate_nan(arr)
         Larr = length(arr)
@@ -40,6 +42,15 @@ module Signal
         return li, ui
     end
 
+    function get_bandpassed_signal(signal, low, high)
+        SR = 1000
+        FLT_ORDER = 2
+        responsetype = Bandpass(low, high; fs=SR)
+        designmethod = Butterworth(FLT_ORDER)
+        data_flt = filt(digitalfilter(responsetype, designmethod), signal)
+        return data_flt
+    end
+
     function get_beta_data(sig, width=6.0)
         FLT_ORDER = 2
         LOW_FREQ = 13.0
@@ -57,9 +68,7 @@ module Signal
             end
         end
 
-        responsetype = Bandpass(peak_freq - (width / 2.0), peak_freq + (width / 2.0); fs=SR)
-        designmethod = Butterworth(FLT_ORDER)
-        data_flt_beta = filt(digitalfilter(responsetype, designmethod), sig)
+        data_flt_beta = get_bandpassed_signal(sig, peak_freq - (width / 2.0), peak_freq + (width / 2.0))
 
         return data_flt_beta
     end
@@ -139,4 +148,24 @@ module Signal
             return [], [], []
         end
     end
+
+    function get_signal_phase(signal)
+        SR = 1000.0
+        gamma_param = 0.1 # or 0.05
+        OT_suppress = 0.3
+        target_phase = 0.0
+        target_freq = 10.0
+        phase_search = false
+
+        Lt = length(signal)
+        osc = Oscilltracker(target_freq, [target_phase], SR, OT_suppress, gamma_param, phase_search)
+        phase = zeros(Lt)
+        for i in 1:Lt
+            update!(osc, signal[i])
+            phase[i] = get_phase(osc)
+        end
+
+        return phase
+    end
+
 end
