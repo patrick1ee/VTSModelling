@@ -161,9 +161,10 @@ module analysis
         return data_flt_beta
     end
 
-    function run_spec(sig, model, freqs=Nothing, sampling_rate=1000)
+    function run_spec(sig, model; freqs=Nothing, sampling_rate=1000)
         freq, power = get_pow_spec(sig, freqs, sampling_rate)
         plot(freq, power, xlabel="frequency (Hz)", xlim=(6, 55), xticks=6:4:55, size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+
         csv_df = DataFrame(Frequency = freq, PSD = abs.(power))
 
         if model

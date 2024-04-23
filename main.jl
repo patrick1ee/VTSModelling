@@ -249,7 +249,8 @@ function main_raf()
 
     #p = [0.016329117119312286, 3.9730966091156006, 2.6395351886749268, 6.608642578125, 3.699204444885254, 0.35007891058921814, -0.09347619861364365]
     #p = [0.0163153, 8.4994, 22.1685, 17.0323, 27.1569, 7.88831, -20.8976]
-    p = [0.016624921932816505, 4.1515889167785645, 5.530158519744873, 9.802279472351074, 3.491934299468994, 0.16449561715126038, -0.7124000191688538]
+    #p = [0.016624921932816505, 4.1515889167785645, 5.530158519744873, 9.802279472351074, 3.491934299468994, 0.16449561715126038, -0.7124000191688538]
+    p = [0.0165082, 4.79867, 7.75704, 9.93353, 2.27035, -0.115528, -1.50204]
 
     W=[Float32(0.0) Float32(1.0); Float32(1.0) Float32(0.0)]
     etta=Float32(0.5)
@@ -282,9 +283,12 @@ function main_raf()
     A=2*100*1e-3
     f=4
 
-    #stim=create_stimulus(A, f, range_t)
-    #response=create_stim_response(stim, range_t)
-    response = fill(0.0, length(range_t)) #yousif_transfer(A, f, range_t)
+    stim=create_stimulus(A, f, range_t)
+    response=create_stim_response(stim, range_t)
+    plot(range_t, response, xlabel="time (ms)", ylabel="V", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+    savefig("jul-test.png")
+    return
+    #response = fill(0.0, length(range_t)) #yousif_transfer(A, f, range_t)
     #for i in 1:6:T-6
     #    #Start pulse
     #    for j in 0:24
@@ -313,7 +317,7 @@ function main_raf()
 
     df_psd_data = CSV.read("data/psd.csv", DataFrame)   
 
-    run_spec(raw_model_signal, true, df_psd_data[!, 1])
+    run_spec(raw_model_signal, true)
     run_hilbert_pdf(raw_model_signal, true)
 
     run_beta_burst(model_flt_beta, true)
@@ -372,5 +376,5 @@ function main_stim()
     savefig("plot2.png")
 end
 
-#main_raf()
-plot_data_model_features()
+main_raf()
+#plot_data_model_features()

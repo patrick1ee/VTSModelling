@@ -242,8 +242,8 @@ def butterworth_filter(order,X,f,typ,fs):
              
 def get_response(stim, range_t):
     #T=1.0
-    #sr=3000
-    tsensor=tactile_receptors(Ttype='PC',simTime=range_t[-1],sample_rate=len(range_t),sample_num=4000)
+    sr=3000
+    tsensor=tactile_receptors(Ttype='PC',simTime=range_t[-1],sample_rate=sr,sample_num=4000)
     stimulus=np.zeros((1,tsensor.t.size))
     stimulus[0, :] = stim
 
