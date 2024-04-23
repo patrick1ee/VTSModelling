@@ -289,4 +289,4 @@ module analysis
     end
 end
 
-analysis.analyse()
+#analysis.analyse()

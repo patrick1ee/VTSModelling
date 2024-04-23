@@ -285,7 +285,7 @@ function main_raf()
 
     stim=create_stimulus(A, f, range_t)
     response=create_stim_response(stim, range_t)
-    plot(range_t, response, xlabel="time (ms)", ylabel="V", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+    plot(range_t, response, xlabel="time (ms)", ylabel="V", size=(500,500), xlim=(0, 0.1), xticks=0:0.02:0.1, linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
     savefig("jul-test.png")
     return
     #response = fill(0.0, length(range_t)) #yousif_transfer(A, f, range_t)
