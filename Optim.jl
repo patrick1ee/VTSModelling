@@ -3,7 +3,7 @@ include("./Signal.jl")
 
 using BlackBoxOptim, CSV, DataFrames, Distributions, DSP, FFTW, KernelDensity, KissSmoothing, Optimization, OptimizationCMAEvolutionStrategy, Plots, Statistics
 
-using .BenoitModel: create_benoit_model, simulate_benoit_model
+using .BenoitModel: create_benoit_model, create_benoit_node, create_benoit_network, simulate_benoit_model
 using .Signal: get_beta_data, get_pow_spec, get_hilbert_amplitude_pdf, get_burst_durations
 
 const SR = 1000  # recording sampling rate in Hz, do not change this
@@ -131,38 +131,65 @@ function cost_bb(params)
 end
 
 function init_param(bounds, NPARAMS=2500)
-    tau_dist = Uniform(bounds[1][1], bounds[1][2])
-    w_EE_dist = Uniform(bounds[2][1], bounds[2][2])
-    w_EI_dist = Uniform(bounds[3][1], bounds[3][2])
-    w_IE_dist = Uniform(bounds[4][1], bounds[4][2])
-    beta_dist = Uniform(bounds[5][1], bounds[5][2])
-    theta_E_dist = Uniform(bounds[6][1], bounds[6][2])
-    theta_I_dist = Uniform(bounds[7][1], bounds[7][2])
+    tau_A_dist = Uniform(bounds[1][1], bounds[1][2])
+    w_EE_A_dist = Uniform(bounds[2][1], bounds[2][2])
+    w_EI_A_dist = Uniform(bounds[3][1], bounds[3][2])
+    w_IE_A_dist = Uniform(bounds[4][1], bounds[4][2])
+    beta_A_dist = Uniform(bounds[5][1], bounds[5][2])
+    theta_E_A_dist = Uniform(bounds[6][1], bounds[6][2])
+    theta_I_A_dist = Uniform(bounds[7][1], bounds[7][2])
 
-    N=2
-    W=[Float32(0.0) Float32(1.0); Float32(1.0) Float32(0.0)]
-    etta=Float32(0.50)
+    tau_B_dist = Uniform(bounds[8][1], bounds[8][2])
+    w_EE_B_dist = Uniform(bounds[9][1], bounds[9][2])
+    w_EI_B_dist = Uniform(bounds[10][1], bounds[10][2])
+    w_IE_B_dist = Uniform(bounds[11][1], bounds[11][2])
+    beta_B_dist = Uniform(bounds[12][1], bounds[12][2])
+    theta_E_B_dist = Uniform(bounds[13][1], bounds[13][2])
+    theta_I_B_dist = Uniform(bounds[14][1], bounds[14][2])
+
+    etta_dist = Uniform(bounds[15][1], bounds[15][2])
+    w12_dist = Uniform(bounds[16][1], bounds[16][2])
+    w21_dist = Uniform(bounds[17][1], bounds[17][2])
 
     psd_df = CSV.read("data/psd.csv", DataFrame)
     xPSD = psd_df[!, 1]
     yPSDdat = psd_df[!, 2]
     peakDat = argmax(yPSDdat)
 
-    csv_df_w = DataFrame(tau=[0.0], w_EE=[0.0], w_EI=[0.0], w_IE=[0.0], beta=[0.0], theta_E=[0.0], theta_I=[0.0])
+    csv_df_w = DataFrame(
+        etta = [0.0], w12 = [0.0], w21 = [0.0],
+        tau_A=[0.0], w_EE_A=[0.0], w_EI_A=[0.0], w_IE_A=[0.0], beta_A=[0.0], theta_E_A=[0.0], theta_I_A=[0.0],
+        tau_B=[0.0], w_EE_B=[0.0], w_EI_B=[0.0], w_IE_B=[0.0], beta_B=[0.0], theta_E_B=[0.0], theta_I_B=[0.0]
+    )
     CSV.write("data/params-1.csv", csv_df_w)
 
     count = 0
 
     while count < NPARAMS
-        tau_p = Float32(rand(tau_dist))
-        w_EE_p = Float32(rand(w_EE_dist))
-        w_EI_p = Float32(rand(w_EI_dist))
-        w_IE_p = Float32(rand(w_IE_dist))
-        beta_p = Float32(rand(beta_dist))
-        theta_E_p = Float32(rand(theta_E_dist))
-        theta_I_p = Float32(rand(theta_I_dist))
+        etta_p = Float32(rand(etta_dist))
+        w12_p = Float32(rand(w12_dist))
+        w21_p = Float32(rand(w21_dist))
 
-        model = create_benoit_model(N, W, etta, tau_p, tau_p, w_EE_p, w_EI_p, w_IE_p, beta_p)
+        tau_A_p = Float32(rand(tau_A_dist))
+        w_EE_A_p = Float32(rand(w_EE_A_dist))
+        w_EI_A_p = Float32(rand(w_EI_A_dist))
+        w_IE_A_p = Float32(rand(w_IE_A_dist))
+        beta_A_p = Float32(rand(beta_A_dist))
+        theta_E_A_p = Float32(rand(theta_E_A_dist))
+        theta_I_A_p = Float32(rand(theta_I_A_dist))
+
+        tau_B_p = Float32(rand(tau_B_dist))
+        w_EE_B_p = Float32(rand(w_EE_B_dist))
+        w_EI_B_p = Float32(rand(w_EI_B_dist))
+        w_IE_B_p = Float32(rand(w_IE_B_dist))
+        beta_B_p = Float32(rand(beta_B_dist))
+        theta_E_B_p = Float32(rand(theta_E_B_dist))
+        theta_I_B_p = Float32(rand(theta_I_B_dist))
+
+        node_A = create_benoit_node(tau_A_p, tau_A_p, w_EE_A_p, w_EI_A_p, w_IE_A_p, beta_A_p)
+        node_B = create_benoit_node(tau_B_p, tau_B_p, w_EE_B_p, w_EI_B_p, w_IE_B_p, beta_B_p)
+        model = create_benoit_network([node_A, node_B], [Float32(0.0) Float32(w12_p); Float32(w21_p) Float32(0.0)], etta_p)
+
         T = 10.0
         dt = 0.001
         range_t = 0.0:dt:T
@@ -175,8 +202,8 @@ function init_param(bounds, NPARAMS=2500)
         #        end
         #    end
         #end
-        theta_E = [theta_E_p, theta_E_p]
-        theta_I = [theta_I_p, theta_I_p]
+        theta_E = [theta_E_A_p, theta_E_B_p]
+        theta_I = [theta_I_A_p, theta_I_B_p]
         stim = response
         df = run_act_time(model, simulate_benoit_model, range_t, dt, theta_E, theta_I, stim)
 
@@ -188,7 +215,11 @@ function init_param(bounds, NPARAMS=2500)
         #print(string(freq[peakMod])*" "*string(xPSD[peakDat])*"\n")
 
         if abs(xPSD[peakDat] - freq[peakMod]) <= 1.0 && abs(yPSDmod[peakMod] - yPSDdat[peakDat]) <= 0.25*yPSDdat[peakDat]
-            new_row = (tau=tau_p, w_EE=w_EE_p, w_EI=w_EI_p, w_IE=w_IE_p, beta=beta_p, theta_E=theta_E_p, theta_I=theta_I_p)
+            new_row= (
+                etta=etta_p, w12=w12_p, w21=w21_p,
+                tau_A=tau_A_p, w_EE_A=w_EE_A_p, w_EI_A=w_EI_A_p, w_IE_A=w_IE_A_p, beta_A=beta_A_p, theta_E_A=theta_E_A_p, theta_I_A=theta_I_A_p,
+                tau_B=tau_B_p, w_EE_B=w_EE_B_p, w_EI_B=w_EI_A_p, w_IE_B=w_IE_B_p, beta_B=beta_B_p, theta_E_B=theta_E_B_p, theta_I_B=theta_I_B_p
+            )
             df_csv_r = CSV.read("data/params-1.csv", DataFrame)
             push!(df_csv_r, new_row)
             CSV.write("data/params-1.csv", df_csv_r)
@@ -290,14 +321,20 @@ function rosenbrock2d(x)
 end
 
 function Optim()
-    p_range=[(0.016, 0.017), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (-2.0, 10.0), (-10.0, 2.0)]
-    good_guess = [0.016624921932816505, 4.1515889167785645, 5.530158519744873, 9.802279472351074, 3.491934299468994, 0.16449561715126038, -0.7124000191688538]
-    res = bboptimize(cost_bb, good_guess, SearchRange=p_range, MaxSteps=100000)
-    return
+    #p_range=[(0.016, 0.017), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (-2.0, 10.0), (-10.0, 2.0)]
+    #good_guess = [0.016624921932816505, 4.1515889167785645, 5.530158519744873, 9.802279472351074, 3.491934299468994, 0.16449561715126038, -0.7124000191688538]
+    #res = bboptimize(cost_bb, good_guess, SearchRange=p_range, MaxSteps=100000)
+    #return
 
-    #p_bounds = [(0.016, 0.017), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (-2.0, 10.0), (-10.0, 2.0)]
-    #init_param(p_bounds)
-    #opt_param()
+    p_bounds = [
+        (0.016, 0.017), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (-2.0, 10.0), (-10.0, 2.0),
+        (0.016, 0.017), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (-2.0, 10.0), (-10.0, 2.0),
+        (0.0, 0.1), (0.0, 1.0), (0.0, 1.0)
+    ]
+    init_param(p_bounds)
+    opt_param()
+
+    return
 
     df_csv_r = CSV.read("data/params.csv", DataFrame)
     V = []
@@ -320,4 +357,4 @@ function Optim()
 end
 
 #opt_param()
-#Optim()
+Optim()

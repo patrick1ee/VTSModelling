@@ -2,7 +2,7 @@ module BenoitModel
 
     using DiffEqNoiseProcess, JSON, Plots, StatsBase
 
-    export BenoitModel, create_benoit_model, simulate_benoit_model
+    export BenoitModel, create_benoit_model, create_benoit_node, create_benoit_network, simulate_benoit_model
 
     struct Node
         tau_E::Float32
@@ -31,6 +31,14 @@ module BenoitModel
     function create_benoit_model(N::Int64, W::Matrix{Float32}, etta::Float32, tau_E::Float32, tau_I::Float32, w_EE::Float32, w_EI::Float32, w_IE::Float32, beta::Float32)
         nodes = [Node(tau_E, tau_I, w_EE, w_EI, w_IE, beta, WienerProcess(0.0,NOISE_DEV, 1.0), WienerProcess(0.0,NOISE_DEV, 1.0)) for _ in 1:N]
         return Network(nodes, W, etta)
+    end
+
+    function create_benoit_node(tau_E::Float32, tau_I::Float32, w_EE::Float32, w_EI::Float32, w_IE::Float32, beta::Float32)
+        return Node(tau_E, tau_I, w_EE, w_EI, w_IE, beta, WienerProcess(0.0,NOISE_DEV, 1.0), WienerProcess(0.0,NOISE_DEV, 1.0))
+    end
+
+    function create_benoit_network(nodes, W::Matrix{Float32}, etta::Float32)
+        return Network([nodes[i] for i in 1:length(nodes)], W, etta)
     end
 
     function sigmoid(x, beta)

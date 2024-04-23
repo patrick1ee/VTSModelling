@@ -377,4 +377,4 @@ function main_stim()
 end
 
 main_raf()
-#plot_data_model_features()
+plot_data_model_features()
