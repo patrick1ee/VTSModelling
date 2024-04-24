@@ -34,6 +34,20 @@ function run_act_time(m, simulate, range_t, dt, theta_E, theta_I, stim_response)
     return DataFrame(T=T, R=R, theta_E=theta_E_t, theta_I=theta_I_t)
 end
 
+
+psd_df = CSV.read("data/psd.csv", DataFrame)
+xPSD = psd_df[!, 1]
+yPSDdat = psd_df[!, 2]
+
+beta_amp_pdf_df = CSV.read("data/beta-hpdf.csv", DataFrame)
+yBAPDFdat = beta_amp_pdf_df[!, 2]
+
+beta_dur_pdf_df = CSV.read("data/beta-dur-hpdf.csv", DataFrame)
+yBDPDFdat = beta_dur_pdf_df[!, 2]
+
+plv_df = CSV.read("data/plvs.csv", DataFrame)
+yPLVdat = plv_df[!, 2]
+
 function cost_bb(params)
     SR = 1000
 
@@ -80,23 +94,10 @@ function cost_bb(params)
     Ebeta = get_beta_data(df.R[1].rE)
     Ebeta = Ebeta .- mean(Ebeta) / std(Ebeta)
 
-    psd_df = CSV.read("data/psd.csv", DataFrame)
-    xPSD = psd_df[!, 1]
-    yPSDdat = psd_df[!, 2]
     freq, yPSDmod = get_pow_spec(Eproc, xPSD, SR)
-
-    beta_amp_pdf_df = CSV.read("data/beta-hpdf.csv", DataFrame)
-    yBAPDFdat = beta_amp_pdf_df[!, 2]
     _, yBAPDFmod, Ebeta_ha = get_hilbert_amplitude_pdf(Ebeta)
-
-    beta_dur_pdf_df = CSV.read("data/beta-dur-hpdf.csv", DataFrame)
-    yBDPDFdat = beta_dur_pdf_df[!, 2]
     _, yBDPDFmod, _ = get_burst_durations(Ebeta_ha)
-
-    plv_df = CSV.read("data/plvs.csv", DataFrame)
-    yPLVdat = plv_df[!, 2]
     yPLVmod = get_plv_freq(Eproc, Eproc_alt)
-
 
     if length(yPSDmod) > length(yPSDdat)
         yPSDmod = yPSDmod[1:length(yPSDdat)]
@@ -163,14 +164,14 @@ function init_param(bounds, NPARAMS=2500)
         tau_A=[0.0], w_EE_A=[0.0], w_EI_A=[0.0], w_IE_A=[0.0], beta_A=[0.0], theta_E_A=[0.0], theta_I_A=[0.0],
         tau_B=[0.0], w_EE_B=[0.0], w_EI_B=[0.0], w_IE_B=[0.0], beta_B=[0.0], theta_E_B=[0.0], theta_I_B=[0.0]
     )
-    CSV.write("data/params-1.csv", csv_df_w)
+    CSV.write("data/params-2.csv", csv_df_w)
 
     count = 0
 
     while count < NPARAMS
-        etta_p = Float32(rand(etta_dist))
-        w12_p = Float32(rand(w12_dist))
-        w21_p = Float32(rand(w21_dist))
+        etta_p = 0.5
+        w12_p = 1.0
+        w21_p = 1.0
 
         tau_A_p = Float32(rand(tau_A_dist))
         w_EE_A_p = Float32(rand(w_EE_A_dist))
@@ -180,19 +181,27 @@ function init_param(bounds, NPARAMS=2500)
         theta_E_A_p = Float32(rand(theta_E_A_dist))
         theta_I_A_p = Float32(rand(theta_I_A_dist))
 
-        tau_B_p = Float32(rand(tau_B_dist))
-        w_EE_B_p = Float32(rand(w_EE_B_dist))
-        w_EI_B_p = Float32(rand(w_EI_B_dist))
-        w_IE_B_p = Float32(rand(w_IE_B_dist))
-        beta_B_p = Float32(rand(beta_B_dist))
+        #tau_B_p = Float32(rand(tau_B_dist))
+        #w_EE_B_p = Float32(rand(w_EE_B_dist))
+        #w_EI_B_p = Float32(rand(w_EI_B_dist))
+        #w_IE_B_p = Float32(rand(w_IE_B_dist))
+        #beta_B_p = Float32(rand(beta_B_dist))
+        #theta_E_B_p = Float32(rand(theta_E_B_dist))
+        #theta_I_B_p = Float32(rand(theta_I_B_dist))
+
+        tau_B_p = tau_A_p
+        w_EE_B_p = w_EE_A_p
+        w_EI_B_p = w_EI_A_p
+        w_IE_B_p = w_IE_A_p
+        beta_B_p = beta_A_p
         theta_E_B_p = Float32(rand(theta_E_B_dist))
         theta_I_B_p = Float32(rand(theta_I_B_dist))
 
         node_A = create_benoit_node(tau_A_p, tau_A_p, w_EE_A_p, w_EI_A_p, w_IE_A_p, beta_A_p)
         node_B = create_benoit_node(tau_B_p, tau_B_p, w_EE_B_p, w_EI_B_p, w_IE_B_p, beta_B_p)
-        model = create_benoit_network([node_A, node_B], [Float32(0.0) Float32(w12_p); Float32(w21_p) Float32(0.0)], etta_p)
+        model = create_benoit_network([node_A, node_B], [Float32(0.0) Float32(w12_p); Float32(w21_p) Float32(0.0)], Float32(etta_p))
 
-        T = 10.0
+        T = 100.0
         dt = 0.001
         range_t = 0.0:dt:T
         response = fill(0.0, length(range_t)) 
@@ -222,9 +231,9 @@ function init_param(bounds, NPARAMS=2500)
                 tau_A=tau_A_p, w_EE_A=w_EE_A_p, w_EI_A=w_EI_A_p, w_IE_A=w_IE_A_p, beta_A=beta_A_p, theta_E_A=theta_E_A_p, theta_I_A=theta_I_A_p,
                 tau_B=tau_B_p, w_EE_B=w_EE_B_p, w_EI_B=w_EI_A_p, w_IE_B=w_IE_B_p, beta_B=beta_B_p, theta_E_B=theta_E_B_p, theta_I_B=theta_I_B_p
             )
-            df_csv_r = CSV.read("data/params-1.csv", DataFrame)
+            df_csv_r = CSV.read("data/params-2.csv", DataFrame)
             push!(df_csv_r, new_row)
-            CSV.write("data/params-1.csv", df_csv_r)
+            CSV.write("data/params-2.csv", df_csv_r)
             count += 1
             print("Added " * string(count) * " / 2500 parameters\n")
             print("pmidx: " * string(peakMod) * "pdidx: " * string(peakDat) * "peak mod: " * string(freq[peakMod]) * " peak dat: " * string(xPSD[peakDat]) * " diff: " * string(abs(xPSD[peakDat] - freq[peakMod])) * " " * string(abs(yPSDmod[peakMod] - yPSDdat[peakDat])) * " " * string(0.25*yPSDdat[peakDat]) * "\n")
@@ -323,11 +332,11 @@ function rosenbrock2d(x)
 end
 
 function Optim()
-    p_range=[(0.016, 0.017), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (-2.0, 10.0), (-10.0, 2.0), (-2.0, 10.0), (-10.0, 2.0)]
+    #p_range=[(0.016, 0.017), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (-2.0, 10.0), (-10.0, 2.0), (-2.0, 10.0), (-10.0, 2.0)]
     #good_guess = [0.016624921932816505, 4.1515889167785645, 5.530158519744873, 9.802279472351074, 3.491934299468994, 0.16449561715126038, -0.7124000191688538]
-    good_guess = [0.0165082, 4.79867, 7.75704, 9.93353, 2.27035, -0.115528, -1.50204, -0.115528, -1.50204]
-    res = bboptimize(cost_bb, good_guess, SearchRange=p_range, MaxSteps=100000)
-    return
+    #good_guess = [0.0165082, 4.79867, 7.75704, 9.93353, 2.27035, -0.115528, -1.50204, -0.115528, -1.50204]
+    #res = bboptimize(cost_bb, good_guess, SearchRange=p_range, MaxSteps=100000)
+    #return
 
     p_bounds = [
         (0.016, 0.017), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (-2.0, 10.0), (-10.0, 2.0),
@@ -335,7 +344,7 @@ function Optim()
         (0.0, 0.1), (0.0, 1.0), (0.0, 1.0)
     ]
     init_param(p_bounds)
-    opt_param()
+    #opt_param()
 
     return
 

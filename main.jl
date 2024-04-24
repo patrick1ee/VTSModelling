@@ -106,6 +106,23 @@ function plot_data_model_features()
     df_plvs_model = CSV.read("data/plvs-m.csv", DataFrame)
 
     plot(
+        [df_psd_data[!, 1], df_psd_model[!, 1]],
+        [df_psd_data[!, 2], df_psd_model[!, 2]],
+        xlabel="frequency (Hz)",
+        size=(500,500),
+        linewidth=3,
+        xtickfont=16,
+        ytickfont=16,
+        legend=false,
+        titlefont=16,
+        guidefont=16,
+        tickfont=16,
+        legendfont=16
+    )
+    savefig("plots/optim/comb/pdf.png")
+
+
+    plot(
         df_beta_amp_pdf_data[!, 1],
         [df_beta_amp_pdf_data[!, 2], df_beta_amp_pdf_model[!, 2]],
         xlabel="amplitude",
@@ -268,7 +285,9 @@ function main_raf()
     #p = [0.016329117119312286, 3.9730966091156006, 2.6395351886749268, 6.608642578125, 3.699204444885254, 0.35007891058921814, -0.09347619861364365]
     #p = [0.0163153, 8.4994, 22.1685, 17.0323, 27.1569, 7.88831, -20.8976]
     #p = [0.016624921932816505, 4.1515889167785645, 5.530158519744873, 9.802279472351074, 3.491934299468994, 0.16449561715126038, -0.7124000191688538]
-    p = [0.0165082, 4.79867, 7.75704, 9.93353, 2.27035, -0.115528, -1.50204]
+    #BB p = [0.0165082, 4.79867, 7.75704, 9.93353, 2.27035, -0.115528, -1.50204]
+    p = [0.016075320541858673,7.580315589904785,5.22007942199707,7.1634345054626465,0.7875996828079224,0.8672178983688354,-1.7587604522705078, 2.445979595184326,0.2242824137210846]
+    #p = [0.0165082, 4.79867, 7.75704, 9.93353, 2.27035, -0.115528, -1.50204]
 
     W=[Float32(0.0) Float32(1.0); Float32(1.0) Float32(0.0)]
     etta=Float32(0.5)
@@ -278,8 +297,10 @@ function main_raf()
     w_EI = Float32(p[3])
     w_IE = Float32(p[4])
     beta = Float32(p[5])
-    thE = Float32(p[6])
-    thI = Float32(p[7])
+    thE_A = Float32(p[6])
+    thI_A = Float32(p[7])
+    thE_B = Float32(p[6])
+    thI_B = Float32(p[7])
 
     model = create_benoit_model(N, W, etta, tau_E, tau_I, w_EE, w_EI, w_IE, beta)
     
@@ -316,9 +337,9 @@ function main_raf()
     #        end
     #    end
     #end
-    theta_E = [thE, thE]
-    theta_I = [thI, thI]
-    stim = response
+    theta_E = [thE_A, thE_B]
+    theta_I = [thI_A, thI_B]
+    #stim = response
     df = run_act_time(model, simulate_benoit_model, range_t, dt, theta_E, theta_I, stim)
 
     #filter = digitalfilter(Bandpass(3.0,7.0),Butterworth(2))
@@ -398,5 +419,5 @@ function main_stim()
     savefig("plot2.png")
 end
 
-main_raf()
+#main_raf()
 plot_data_model_features()
