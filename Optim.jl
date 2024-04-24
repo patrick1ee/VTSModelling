@@ -338,11 +338,14 @@ function rosenbrock2d(x)
 end
 
 function Optim()
-    #p_range=[(0.016, 0.017), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (-2.0, 10.0), (-10.0, 2.0), (-2.0, 10.0), (-10.0, 2.0)]
-    #good_guess = [0.016624921932816505, 4.1515889167785645, 5.530158519744873, 9.802279472351074, 3.491934299468994, 0.16449561715126038, -0.7124000191688538]
-    #good_guess = [0.0165082, 4.79867, 7.75704, 9.93353, 2.27035, -0.115528, -1.50204, -0.115528, -1.50204]
-    #res = bboptimize(cost_bb, good_guess, SearchRange=p_range, MaxSteps=100000)
-    #return
+    p_range=[(0.016, 0.017), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (-2.0, 10.0), (-10.0, 2.0)]
+    df_csv_r = CSV.read("data/params-wc-mir-1.3-0.9-0.9-0.9.csv", DataFrame)
+    good_guess = []
+    for i in 1:nrow(df_csv_r)
+        push!(good_guess, [v for v in values(df_csv_r[i,:])])
+    end
+    res = bboptimize(cost_bb, good_guess; SearchRange=p_range)
+    return
 
     p_bounds = [
         (0.016, 0.017), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (-2.0, 10.0), (-10.0, 2.0),
@@ -375,7 +378,7 @@ function Optim()
 end
 
 #opt_param()
-#Optim()
+Optim()
 
 
 
