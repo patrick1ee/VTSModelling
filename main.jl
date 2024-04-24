@@ -113,13 +113,12 @@ function plot_data_model_features()
         linewidth=3,
         xtickfont=16,
         ytickfont=16,
-        legend=false,
+        label=["data" "model"],
         titlefont=16,
         guidefont=16,
         tickfont=16,
-        legendfont=16
     )
-    savefig("plots/optim/comb/pdf.png")
+    savefig("plots/optim/comb/psd.png")
 
 
     plot(
@@ -130,11 +129,10 @@ function plot_data_model_features()
         linewidth=3, 
         xtickfont=16,
         ytickfont=16,
-        legend=false,
+        label=["data" "model"],
         titlefont=16, 
         guidefont=16,
         tickfont=16,
-        legendfont=16
     )
     savefig("plots/optim/comb/beta-amp-pdf.png")
 
@@ -146,11 +144,10 @@ function plot_data_model_features()
         linewidth=3, 
         xtickfont=16,
         ytickfont=16,
-        legend=false,
+        label=["data" "model"],
         titlefont=16, 
         guidefont=16,
         tickfont=16,
-        legendfont=16
     )
     savefig("plots/optim/comb/beta-dur-pdf.png")
 
@@ -162,11 +159,10 @@ function plot_data_model_features()
         linewidth=3,
         xtickfont=16,
         ytickfont=16,
-        legend=false,
+        label=["data" "model"],
         titlefont=16,
         guidefont=16,
-        tickfont=16,
-        legendfont=16
+        tickfont=16
     )
     savefig("plots/optim/comb/plv.png")
 end
@@ -419,5 +415,5 @@ function main_stim()
     savefig("plot2.png")
 end
 
-#main_raf()
+main_raf()
 plot_data_model_features()

@@ -34,20 +34,6 @@ function run_act_time(m, simulate, range_t, dt, theta_E, theta_I, stim_response)
     return DataFrame(T=T, R=R, theta_E=theta_E_t, theta_I=theta_I_t)
 end
 
-
-psd_df = CSV.read("data/psd.csv", DataFrame)
-xPSD = psd_df[!, 1]
-yPSDdat = psd_df[!, 2]
-
-beta_amp_pdf_df = CSV.read("data/beta-hpdf.csv", DataFrame)
-yBAPDFdat = beta_amp_pdf_df[!, 2]
-
-beta_dur_pdf_df = CSV.read("data/beta-dur-hpdf.csv", DataFrame)
-yBDPDFdat = beta_dur_pdf_df[!, 2]
-
-plv_df = CSV.read("data/plvs.csv", DataFrame)
-yPLVdat = plv_df[!, 2]
-
 function cost_bb(params)
     SR = 1000
 
@@ -63,8 +49,8 @@ function cost_bb(params)
     beta = Float32(params[5])
     theta_E_A_param = Float32(params[6])
     theta_I_A_param = Float32(params[7])
-    theta_E_B_param = Float32(params[8])
-    theta_I_B_param = Float32(params[9])
+    theta_E_B_param = Float32(params[6])
+    theta_I_B_param = Float32(params[7])
 
     model = create_benoit_model(N, W, etta, tau_E, tau_I, w_EE, w_EI, w_IE, beta)
     
@@ -88,6 +74,19 @@ function cost_bb(params)
     stim = response
     df = run_act_time(model, simulate_benoit_model, range_t, dt, theta_E, theta_I, stim)
 
+    psd_df = CSV.read("data/psd.csv", DataFrame)
+    xPSD = psd_df[!, 1]
+    yPSDdat = psd_df[!, 2]
+
+    beta_amp_pdf_df = CSV.read("data/beta-hpdf.csv", DataFrame)
+    yBAPDFdat = beta_amp_pdf_df[!, 2]
+
+    beta_dur_pdf_df = CSV.read("data/beta-dur-hpdf.csv", DataFrame)
+    yBDPDFdat = beta_dur_pdf_df[!, 2]
+
+    plv_df = CSV.read("data/plvs.csv", DataFrame)
+    yPLVdat = plv_df[!, 2]
+
     #zscore
     Eproc = df.R[1].rE .- mean(df.R[1].rE) / std(df.R[1].rE)
     Eproc_alt = df.R[2].rE .- mean(df.R[2].rE) / std(df.R[2].rE)
@@ -105,9 +104,11 @@ function cost_bb(params)
         yPSDdat = yPSDdat[1:length(yPSDmod)]
     end
     
+    coeffs = [1.3, 0.9, 0.9, 0.9]
     cost1 = 1.0
     cost2 = 1.0
     cost3 = 1.0
+    cost4 = 1.0
 
     cost1 = (sum((yPSDdat .- yPSDmod).^2) / sum((yPSDdat .- mean(yPSDdat)).^2)) / 4
 
@@ -120,7 +121,7 @@ function cost_bb(params)
 
     cost4 = (sum((yPLVdat .- yPLVmod).^2) / sum((yPLVdat .- mean(yPLVdat)).^2)) / 4
 
-    cost = cost1 + cost2 + cost3 + cost4
+    cost = coeffs[1]*cost1 + coeffs[2]*cost2 + coeffs[3]*cost3 + coeffs[4]*cost4
 
     filename="costs.txt"
 
@@ -313,17 +314,22 @@ end
 end=#
 
 function opt_param()
-    best_param = []
-    best_cost = 1000.0
+    best_params = [[],[],[],[],[],[],[],[],[],[]]
+    best_costs = [1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0]
     df_csv_r = CSV.read("data/params.csv", DataFrame)
     for (i, row) in enumerate(eachrow(df_csv_r))
         p = [v for v in values(df_csv_r[i,:])]
         cost = cost_bb(p)
-        if cost < best_cost
-            best_cost = cost
-            best_param = p
-            println("Best cost: ", best_cost, " Best param: ", best_param)
+
+        max_index = argmax(best_costs)
+        if cost < best_costs[max_index]
+            best_costs[max_index] = cost
+            best_params[max_index] = p
+            println("Costs: ", best_costs)   
         end
+    end
+    for (i, p) in enumerate(best_params)
+        println("Best params ", i, ": ", p)
     end
 end
 
@@ -370,3 +376,6 @@ end
 
 #opt_param()
 #Optim()
+
+
+
