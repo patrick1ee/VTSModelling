@@ -8,7 +8,7 @@ module analysis
 
     const SR = 1000  # recording sampling rate in Hz, do not change this
 
-    export run_spec, run_hilbert_pdf, run_beta_burst
+    export run_spec, run_hilbert_pdf, run_beta_burst, run_plv
 
     function interpolate_nan(arr)
         Larr = length(arr)
@@ -233,7 +233,7 @@ module analysis
 
     function run_plv(s1, s2, model)
         plvs = []
-        freqs = 6:55
+        freqs = 6:29
         for f in freqs
             s1f = get_bandpassed_signal(s1, f-0.5, f+0.5)
             s2f = get_bandpassed_signal(s2, f-0.5, f+0.5)
@@ -351,4 +351,4 @@ module analysis
     end
 end
 
-analysis.analyse()
+#analysis.analyse()

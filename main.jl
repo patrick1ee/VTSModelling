@@ -15,7 +15,7 @@ using .Stimulation: create_stimulus, create_stim_response, yousif_transfer
 
 using .Signal: get_pow_spec, get_hilbert_amplitude_pdf, get_beta_data
 
-using .analysis: run_spec, run_hilbert_pdf, run_beta_burst
+using .analysis: run_spec, run_hilbert_pdf, run_beta_burst, run_plv
 
 
 function create_oscill_input(A, f, base, phase, range_t)
@@ -102,11 +102,13 @@ function plot_data_model_features()
     df_beta_amp_pdf_model = CSV.read("data/beta-hpdf-m.csv", DataFrame)
     df_beta_dur_pdf_data = CSV.read("data/beta-dur-hpdf.csv", DataFrame)
     df_beta_dur_pdf_model = CSV.read("data/beta-dur-pdf-m.csv", DataFrame)
+    df_plvs_data = CSV.read("data/plvs.csv", DataFrame)
+    df_plvs_model = CSV.read("data/plvs-m.csv", DataFrame)
 
     plot(
         df_beta_amp_pdf_data[!, 1],
         [df_beta_amp_pdf_data[!, 2], df_beta_amp_pdf_model[!, 2]],
-        xlabel="frequency (Hz)",
+        xlabel="amplitude",
         size=(500,500),
         linewidth=3, 
         xtickfont=16,
@@ -134,6 +136,22 @@ function plot_data_model_features()
         legendfont=16
     )
     savefig("plots/optim/comb/beta-dur-pdf.png")
+
+    plot(
+        df_plvs_data[!, 1],
+        [df_plvs_data[!, 2], df_plvs_model[!, 2]],
+        xlabel="frequency (Hz)",
+        size=(500,500),
+        linewidth=3,
+        xtickfont=16,
+        ytickfont=16,
+        legend=false,
+        titlefont=16,
+        guidefont=16,
+        tickfont=16,
+        legendfont=16
+    )
+    savefig("plots/optim/comb/plv.png")
 end
 
 function run_max_min(m, simulate, range_t, dt, range_theta_input, theta_const, input_pop)
@@ -285,9 +303,10 @@ function main_raf()
 
     stim=create_stimulus(A, f, range_t)
     response=create_stim_response(stim, range_t)
-    plot(range_t, response, xlabel="time (ms)", ylabel="V", size=(500,500), xlim=(0, 0.1), xticks=0:0.02:0.1, linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
-    savefig("jul-test.png")
-    return
+    #plot(range_t, response, xlabel="time (ms)", ylabel="V", size=(500,500), xlim=(0, 0.1), xticks=0:0.02:0.1, linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+    #savefig("jul-test.png")
+
+    stim = zeros(length(range_t))
     #response = fill(0.0, length(range_t)) #yousif_transfer(A, f, range_t)
     #for i in 1:6:T-6
     #    #Start pulse
@@ -311,7 +330,9 @@ function main_raf()
 
     #zscore
     cut_model_signal = df.R[1].rE[100:end]
+    cut_model_alt_signal = df.R[2].rE[100:end]
     raw_model_signal = (cut_model_signal .- mean(cut_model_signal)) ./ std(cut_model_signal)
+    raw_model_alt_signal = (cut_model_alt_signal .- mean(cut_model_alt_signal)) ./ std(cut_model_alt_signal)
     model_flt_beta = get_beta_data(cut_model_signal)
     model_flt_beta = (model_flt_beta .- mean(model_flt_beta)) ./ std(model_flt_beta)
 
@@ -321,6 +342,7 @@ function main_raf()
     run_hilbert_pdf(raw_model_signal, true)
 
     run_beta_burst(model_flt_beta, true)
+    run_plv(raw_model_signal, raw_model_alt_signal, true)
 
     plot(1:length(raw_model_signal), raw_model_signal, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
     savefig("plots/optim/model/raw.png")

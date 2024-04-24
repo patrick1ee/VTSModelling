@@ -2,9 +2,9 @@ module Signal
 
     include("./Oscilltrack.jl")
     using .Oscilltrack: Oscilltracker, update!, get_phase
-    using DSP, FFTW, KernelDensity, KissSmoothing
+    using DSP, FFTW, KernelDensity, KissSmoothing, StatsBase, Statistics
 
-    export get_bandpassed_signal, get_beta_data, get_pow_spec, get_hilbert_amplitude_pdf, get_burst_durations, get_signal_phase
+    export get_bandpassed_signal, get_beta_data, get_pow_spec, get_hilbert_amplitude_pdf, get_burst_durations, get_signal_phase, get_plv_freq
 
     function interpolate_nan(arr)
         Larr = length(arr)
@@ -161,11 +161,25 @@ module Signal
         osc = Oscilltracker(target_freq, [target_phase], SR, OT_suppress, gamma_param, phase_search)
         phase = zeros(Lt)
         for i in 1:Lt
-            update!(osc, signal[i])
+            update!(osc, Float64(signal[i]))
             phase[i] = get_phase(osc)
         end
 
         return phase
+    end
+
+    function get_plv_freq(s1, s2)
+        plvs = []
+        freqs = 6:29
+        for f in freqs
+            s1f = get_bandpassed_signal(s1, f-0.5, f+0.5)
+            s2f = get_bandpassed_signal(s2, f-0.5, f+0.5)
+            p1f = get_signal_phase(s1f)
+            p2f = get_signal_phase(s2f)
+            plv = abs(mean(exp.(1im*(p1f .- p2f))))
+            push!(plvs, plv)
+        end
+        return plvs
     end
 
 end
