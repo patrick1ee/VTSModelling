@@ -135,7 +135,7 @@ module ByrneModel
         return rV,rVu
     end
 
-    function simulate_byrne_EI_network(N::Network, range_t, dt)
+    function simulate_byrne_EI_network(N::Network, range_t, dt, theta_E, theta_I, stim)
         # Initial conditions
         Lt = length(range_t)
         R = [NodeActivity(zeros(Lt), zeros(Lt), zeros(Lt), zeros(Lt), zeros(Lt), zeros(Lt)) for _ in N.nodes]
@@ -159,12 +159,12 @@ module ByrneModel
                 
                 C = 0.0
                 for (k, _) in enumerate(N.nodes)
-                    C += N.W[k,j] * R[k].rE[i-1]
+                    C += N.W[k,j] * R[k].rR_E[i-1]
                 end
                 C = N.etta * C / length(N.nodes)
 
-                drR_E = (dt / n.E.tau) * (-R[j].rR_E[i-1] * (n.kv_EE + n.kv_EI) + 2 * R[j].rR_E[i-1] * R[j].rV_E[i-1] + n.E.gamma / (pi * n.E.tau))
-                drR_I = (dt / n.I.tau) * (-R[j].rR_I[i-1] * (n.kv_IE + n.kv_II) + 2 * R[j].rR_I[i-1] * R[j].rV_I[i-1] + n.I.gamma / (pi * n.I.tau))
+                drR_E = (dt / n.E.tau) * (-R[j].rR_E[i-1] * (n.kv_EE + n.kv_EI) + 2 * R[j].rR_E[i-1] * R[j].rV_E[i-1] + n.E.gamma / (pi * n.E.tau) + theta_E[j][i-1])
+                drR_I = (dt / n.I.tau) * (-R[j].rR_I[i-1] * (n.kv_IE + n.kv_II) + 2 * R[j].rR_I[i-1] * R[j].rV_I[i-1] + n.I.gamma / (pi * n.I.tau) + theta_I[j][i-1])
 
                 U_E = n.ks_EE *get_synaptic_activity(n.alpha_EE, dt, R[j].rR_E[i-1]) + n.ks_EI *get_synaptic_activity(n.alpha_EI, dt, R[j].rR_E[i-1])
                 U_I = n.ks_IE *get_synaptic_activity(n.alpha_IE, dt, R[j].rR_I[i-1]) + n.ks_II *get_synaptic_activity(n.alpha_II, dt, R[j].rR_I[i-1])

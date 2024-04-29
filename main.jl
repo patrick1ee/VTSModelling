@@ -195,19 +195,6 @@ function run_act_time(m, simulate, range_t, dt, theta_E, theta_I, stim_response)
     end
 
     R = simulate(m, range_t, dt, theta_E_t, theta_I_t)
-    lR = length(R)
-    for i in 1:lR
-        urE = mean(R[i].rE)
-        srE = std(R[i].rE)
-        urI = mean(R[i].rI)
-        srI = std(R[i].rI)
-
-        for j in 1:length(R[i].rE)
-            R[i].rE[j] = (R[i].rE[j] - urE) / srE
-            R[i].rI[j] = (R[i].rI[j] - urI) / srI
-        end
-    end
-
     T = [range_t for i in 1:length(theta_E)]
     return DataFrame(T=T, R=R, theta_E=theta_E_t, theta_I=theta_I_t)
 end
@@ -226,9 +213,13 @@ function run_byrne_single(p, simulate, range_t, dt)
     return DataFrame(t=range_t, rR=rR, rV=rV, rZ=rZ)
 end
 
-function run_byrne_net(N, simulate, range_t, dt)
-    R = simulate(N, range_t, dt)
-    return DataFrame(t=range_t, rR=R[1].rR_E, rV=R[1].rV_E, rZ=R[1].rZ_E)
+function run_byrne_net(N, simulate, range_t, T, dt, theta_E, theta_I, stim)
+    theta_E_t = [fill(i, length(range_t)) for i in theta_E]
+    theta_I_t = [fill(i, length(range_t)) for i in theta_I]
+
+    R = simulate(N, range_t, dt, theta_E_t, theta_I_t, stim)
+    T = [0.0(dt/1000.0):(T/1000.0) for i in 1:length(theta_E)]   # Convert to s
+    return DataFrame(T=T, R=R, theta_E=theta_E_t, theta_I=theta_I_t)
 end
 
 function run_byrne_if(p, simulate, range_t, dt)
@@ -284,7 +275,16 @@ function main_raf()
     #BB p = [0.0165082, 4.79867, 7.75704, 9.93353, 2.27035, -0.115528, -1.50204]
     #p = [0.016075320541858673,7.580315589904785,5.22007942199707,7.1634345054626465,0.7875996828079224,0.8672178983688354,-1.7587604522705078, 2.445979595184326,0.2242824137210846]
     #p = [0.0165082, 4.79867, 7.75704, 9.93353, 2.27035, -0.115528, -1.50204]
-    p = [0.01684509590268135, 2.808759927749634, 2.9388251304626465, 5.182344913482666, 8.326308250427246, 0.595751166343689, 0.3267395496368408]
+
+    #P20
+    p = [0.016686, 1.30585, 4.18644, 7.88385, 5.09226, 0.496913, -0.904573]
+
+    #E3
+    p = [0.0165725, 2.4, 2.0, 2.0, 20.4199, -5.25897, 3.94641]
+
+    #P7
+    #p = [0.016783476, 7.9688745, 0.50424606, 8.942622, 5.3960485, 0.473071, -8.26678]
+
 
     W=[Float32(0.0) Float32(1.0); Float32(1.0) Float32(0.0)]
     etta=Float32(0.5)
@@ -371,15 +371,21 @@ end
 
 function main_byrne()
     # Parameters (time in ms)
+    p = [23.1, 0.5, 0.5, 0.5, 0.5, 0.5, 0.0, 0.0]
+
     N=2
     W=[Float32(0.0) Float32(1.0); Float32(1.0) Float32(0.0)]
     etta=Float32(1.0)
-    ex = Float32(0.5)
-    ks = Float32(0.5)
-    kv = Float32(0.5)
-    gamma = Float32(0.5)
-    tau = Float32(8.9)
-    alpha = Float32(0.5)
+
+    tau = Float32(p[1])
+    ex = Float32(p[2])
+    ks = Float32(p[3])
+    kv = Float32(p[4])
+    gamma = Float32(p[5])
+    alpha = Float32(p[6])
+
+    thE_A = Float32(p[7])
+    thI_A = Float32(p[8])
 
     vth = 1.000
     vr = -1.000
@@ -390,16 +396,40 @@ function main_byrne()
     I = create_byrne_pop_EI(ex, gamma, tau)
     N = create_byrne_network(N, W, etta, E, I, ks, kv, alpha)
     
-    T = 1000
-    dt = 1.0
+    #timescale now ms
+    T = 100000.0
+    dt = 1.0  
     range_t = 0.0:dt:T
     
+    theta_E = [thE_A, thE_A]
+    theta_I = [thI_A, thI_A]
     #df = run_byrne_single(p, simulate_byrne_pop, range_t, dt)
     #df = run_byrne_if(p, simulate_if_pop, range_t, dt)
-    df= run_byrne_net(N, simulate_byrne_EI_network, range_t, dt)
+    df= run_byrne_net(N, simulate_byrne_EI_network, range_t, T, dt, theta_E, theta_I, [])
 
-    plot_byrne_single(df)
-    #plot_avg_if_activity(df)
+    #timescale now s
+
+    #plot_byrne_single(df)
+    
+    #zscore
+    cut_model_signal = df.R[1].rV_E[100:end]
+    cut_model_alt_signal = df.R[2].rV_E[100:end]
+    raw_model_signal = (cut_model_signal .- mean(cut_model_signal)) ./ std(cut_model_signal)
+    raw_model_alt_signal = (cut_model_alt_signal .- mean(cut_model_alt_signal)) ./ std(cut_model_alt_signal)
+    model_flt_beta = get_beta_data(cut_model_signal)
+    model_flt_beta = (model_flt_beta .- mean(model_flt_beta)) ./ std(model_flt_beta)  
+ 
+    run_spec(raw_model_signal, true)
+    run_hilbert_pdf(raw_model_signal, true)
+ 
+    run_beta_burst(model_flt_beta, true)
+    run_plv(raw_model_signal, raw_model_alt_signal, true)
+ 
+    plot(1:length(raw_model_signal), raw_model_signal, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+    savefig("plots/optim/model/raw.png")
+ 
+    plot(1:length(model_flt_beta), model_flt_beta, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+    savefig("plots/optim/model/flt_beta.png")
 
 end
 

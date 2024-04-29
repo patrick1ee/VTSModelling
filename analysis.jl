@@ -207,7 +207,7 @@ module analysis
             CSV.write("data/beta-hpdf.csv", csv_df)
         end
 
-        plot(1:length(signal), S, xlabel="time", size=(500,500), xlim=(0, 10000), xticks=0:2000:1000, linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+        plot(1:length(signal), S, xlabel="time", size=(500,500), xlim=(0, 10000), xticks=0:2000:10000, linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
         csv_df = DataFrame(x=1:length(signal),y=S)
         
         if model
@@ -233,7 +233,7 @@ module analysis
 
     function run_plv(s1, s2, model)
         plvs = []
-        freqs = 6:29
+        freqs = 6:0.1:29
         for f in freqs
             s1f = get_bandpassed_signal(s1, f-0.5, f+0.5)
             s2f = get_bandpassed_signal(s2, f-0.5, f+0.5)
@@ -267,7 +267,8 @@ module analysis
         end
 
         plot(freqs, plvs)
-        csv_df = DataFrame(Frequency = freqs, PLV = plvs)
+        S, N = denoise(convert(AbstractArray{Float64}, plvs))
+        csv_df = DataFrame(Frequency = freqs, PLV = S)
         if model
             savefig("plots/optim/model/plvs.png")
             CSV.write("data/plvs-m.csv", csv_df)
@@ -303,7 +304,7 @@ module analysis
         return data_outlierRem
     end
 
-    function analyse()
+    function init_data()
         data_path = "Patrick_data"
 
         # Define the size of the time-window for computing the ERP (event-related potential)
@@ -314,8 +315,9 @@ module analysis
         POW_SPECTRUM_FREQS = 6:55  # in Hz
 
         currSubj = "P20"
+        filename = "/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1"
 
-        fid = h5open(data_path*"/"*currSubj*"/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1.hdf5", "r")
+        fid = h5open(data_path*"/"*currSubj*"/"*filename*".hdf5", "r")
         data = read(fid["EEG"])
         close(fid)
 
@@ -329,6 +331,68 @@ module analysis
         data_raw = data_outlierRem
         data_raw_alt = data_outlierRem_alt
 
+        return data_raw, data_flt_beta, data_raw_alt
+    end
+
+    function init_slices()
+        NUM_SLICES = 10.0
+
+        data_raw, data_flt_beta, data_raw_alt = init_data()
+        #zscore
+        data_raw = (data_raw .- mean(data_raw)) ./ std(data_raw)
+        data_flt_beta = (data_flt_beta .- mean(data_flt_beta)) ./ std(data_flt_beta)
+
+        data_raw_alt = (data_raw_alt .- mean(data_raw_alt)) ./ std(data_raw_alt)
+
+        xPSD = []
+        yPSD = []
+        xBAPDF = []
+        yBAPDF = []
+        xBDPF = []
+        yBDPF = []
+        xPLV = []
+        yPLV = []
+
+        for i in 1:NUM_SLICES
+            slice_start = Int(i * length(data_raw) / NUM_SLICES)
+            slice_end = Int((i+1) * length(data_raw) / NUM_SLICES)
+            slice_data = data_raw[slice_start:slice_end]
+            slice_data_alt = data_raw_alt[slice_start:slice_end]
+            slice_data_flt_beta = data_flt_beta[slice_start:slice_end]
+            
+            freq, power = get_pow_spec(slice_data)
+            push!(xPSD, freq)
+            push!(yPSD, power)
+            
+            x, y, ha = get_hilbert_amplitude_pdf(slice_data_flt_beta)
+            S, N = denoise(convert(AbstractArray{Float64}, ha))
+            bx, by, burst_durations = get_burst_durations(S)
+
+            push!(xBAPDF, x)
+            push!(yBAPDF, y)
+            push!(xBDPF, bx)
+            push!(yBDPF, by)
+
+            plvs = []
+            freqs = 6:0.1:29
+            for f in freqs
+                s1f = get_bandpassed_signal(s1, f-0.5, f+0.5)
+                s2f = get_bandpassed_signal(s2, f-0.5, f+0.5)
+                p1f = get_signal_phase(s1f)
+                p2f = get_signal_phase(s2f)
+                plv = abs(mean(exp.(1im*(p1f .- p2f))))
+                push!(plvs, plv)
+            end
+            
+            push!(xPLV, freqs)
+            push!(yPLV, plvs)
+        end
+
+        return xPSD, yPSD, xBAPDF, yBAPDF, xBDPF, yBDPF, xPLV, yPLV
+    end
+
+    function analyse()
+        data_raw, data_flt_beta, data_raw_alt = init_data()
         #zscore
         data_raw = (data_raw .- mean(data_raw)) ./ std(data_raw)
         data_flt_beta = (data_flt_beta .- mean(data_flt_beta)) ./ std(data_flt_beta)
@@ -348,6 +412,8 @@ module analysis
         savefig("plots/optim/data/flt_beta.png")
 
         run_plv(data_raw, data_raw_alt, false)
+
+        print("LEN "*string(length(data_raw))*"\n")
     end
 end
 

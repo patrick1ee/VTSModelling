@@ -170,7 +170,7 @@ module Signal
 
     function get_plv_freq(s1, s2)
         plvs = []
-        freqs = 6:29
+        freqs = 6:0.1:29
         for f in freqs
             s1f = get_bandpassed_signal(s1, f-0.5, f+0.5)
             s2f = get_bandpassed_signal(s2, f-0.5, f+0.5)
