@@ -171,14 +171,14 @@ function cost_bb(params)
 
     tau_E = Float32(params[1])
     tau_I = Float32(params[1])
-    w_EE = Float32(2.4)
-    w_EI = Float32(2.0)
-    w_IE = Float32(2.0)
-    beta = Float32(params[2])
-    theta_E_A_param = Float32(params[3])
-    theta_I_A_param = Float32(params[4])
-    theta_E_B_param = Float32(params[3])
-    theta_I_B_param = Float32(params[4])
+    w_EE = Float32(1.30585)
+    w_EI = Float32(4.18644)
+    w_IE = Float32(7.88385)
+    beta = Float32(5.09226)
+    theta_E_A_param = Float32(params[2])
+    theta_I_A_param = Float32(params[3])
+    theta_E_B_param = Float32(params[2])
+    theta_I_B_param = Float32(params[3])
 
     model = create_benoit_model(N, W, etta, tau_E, tau_I, w_EE, w_EI, w_IE, beta)
     
@@ -238,7 +238,7 @@ function cost_bb(params)
         yPSDdat = yPSDdat[1:length(yPSDmod)]
     end
     
-    coeffs = [1.0, 1.0, 1.0, 1.0]
+    coeffs = [1.05, 0.95, 0.95, 1.05]
     cost1 = 2.0
     cost2 = 2.0
     cost3 = 2.0
@@ -378,7 +378,7 @@ function init_param(bounds, NPARAMS=2500)
     end
 end
 
-function init_param_bc_mir(bounds, NPARAMS=2500)
+function init_param_bc_mir(bounds, NPARAMS=10)
     tau_dist = Uniform(bounds[1][1], bounds[1][2])
     ex_dist = Uniform(bounds[2][1], bounds[2][2])
     ks_dist = Uniform(bounds[3][1], bounds[3][2])
@@ -390,15 +390,15 @@ function init_param_bc_mir(bounds, NPARAMS=2500)
 
     N=2
     W=[Float32(0.0) Float32(1.0); Float32(1.0) Float32(0.0)]
-    etta=Float32(1.0)
+    etta=Float32(0.5)
 
-    psd_df = CSV.read("data/psd.csv", DataFrame)
+    psd_df = CSV.read("data/P9/07_02_2024_P9_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v2/psd.csv", DataFrame)
     xPSD = psd_df[!, 1]
     yPSDdat = psd_df[!, 2]
     peakDat = argmax(yPSDdat)
 
     csv_df_w = DataFrame(tau=[0.0], ex=[0.0], ks=[0.0], kv=[0.0], gamma=[0.0], alpha=[0.0], theta_E=[0.0], theta_I=[0.0])
-    CSV.write("data/params-bc-mir.csv", csv_df_w)
+    CSV.write("data/params/params-bc-mir.csv", csv_df_w)
 
     count = 0
 
@@ -447,14 +447,14 @@ function init_param_bc_mir(bounds, NPARAMS=2500)
             new_row= (
                 tau=tau_p, ex=ex_p, ks=ks_p, kv=kv_p, gamma=gamma_p, alpha=alpha_p, theta_E=theta_E_p, theta_I=theta_I_p,
              )
-            df_csv_r = CSV.read("data/params-bc-mir.csv", DataFrame)
+            df_csv_r = CSV.read("data/params/params-bc-mir.csv", DataFrame)
             push!(df_csv_r, new_row)
-            CSV.write("data/params-bc-mir.csv", df_csv_r)
+            CSV.write("data/params/params-bc-mir.csv", df_csv_r)
             count += 1
             print("Added " * string(count) * " / 2500 parameters\n")
             print("pmidx: " * string(peakMod) * "pdidx: " * string(peakDat) * "peak mod: " * string(freq[peakMod]) * " peak dat: " * string(xPSD[peakDat]) * " diff: " * string(abs(xPSD[peakDat] - freq[peakMod])) * " " * string(abs(yPSDmod[peakMod] - yPSDdat[peakDat])) * " " * string(0.25*yPSDdat[peakDat]) * "\n")
         else
-            println("Reject::pmidx: " * string(peakMod) * "pdidx: " * string(peakDat) * "peak mod: " * string(freq[peakMod]) * " peak dat: " * string(xPSD[peakDat]) * " diff: " * string(abs(xPSD[peakDat] - freq[peakMod])) * " " * string(abs(yPSDmod[peakMod] - yPSDdat[peakDat])) * " " * string(0.25*yPSDdat[peakDat]) * "\n")
+            #println("Reject::pmidx: " * string(peakMod) * "pdidx: " * string(peakDat) * "peak mod: " * string(freq[peakMod]) * " peak dat: " * string(xPSD[peakDat]) * " diff: " * string(abs(xPSD[peakDat] - freq[peakMod])) * " " * string(abs(yPSDmod[peakMod] - yPSDdat[peakDat])) * " " * string(0.25*yPSDdat[peakDat]) * "\n")
         end
     end
 end
@@ -629,10 +629,14 @@ function Optim()
     #for i in 1:nrow(df_csv_r)
     #    push!(good_guess, [v for v in values(df_csv_r[i,:])])
     #end
+    #  0 theta_I
+    #good_guess = [0.016523340716958046,5.432121276855469,3.8098607063293457,6.350203514099121,6.220411777496338,0.5953848361968994]
+    #p_range=[(0.016, 0.017), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (-2.0, 10.0)]
 
-    #fixed weights
-    p_range=[(0.016, 0.017), (0.0, 30.0), (-30.0, 30.0), (-30.0, 30.0)]
-    #good_guess = [0.016686, 1.30585, 4.18644, 7.88385, 0.496913, -0.904573]
+    #Fixed W,beta
+    good_guess = [0.016686, 0.496913, -0.904573]
+    p_range=[(0.016, 0.017), (0.0, 10.0), (-2.0, 10.0)]
+
     res = bboptimize(cost_bb; SearchRange=p_range)
     return
 
@@ -668,5 +672,7 @@ end
 
 #Optim()
 
+#p_byrnes = [(23.09, 23.11), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (-2.0, 10.0), (-10.0, 2.0)]
+#init_param_bc_mir(p_byrnes)
 
 

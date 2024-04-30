@@ -278,9 +278,11 @@ function main_raf()
 
     #P20
     p = [0.016686, 1.30585, 4.18644, 7.88385, 5.09226, 0.496913, -0.904573]
+    good_guess = [0.01684509590268135, 2.808759927749634, 2.9388251304626465, 5.182344913482666, 8.326308250427246, 0.595751166343689, 0.3267395496368408]
+    #p = good_guess
 
-    #E3
-    p = [0.0165725, 2.4, 2.0, 2.0, 20.4199, -5.25897, 3.94641]
+    #P20 fixedWB
+    #p = [0.0160928, 1.30585, 4.18644, 7.88385, 5.09226, 0.53322, -0.693958]
 
     #P7
     #p = [0.016783476, 7.9688745, 0.50424606, 8.942622, 5.3960485, 0.473071, -8.26678]
@@ -348,19 +350,19 @@ function main_raf()
 
     #zscore
     cut_model_signal = df.R[1].rE[100:end]
-    cut_model_alt_signal = df.R[2].rE[100:end]
+    #cut_model_alt_signal = df.R[2].rE[100:end]
     raw_model_signal = (cut_model_signal .- mean(cut_model_signal)) ./ std(cut_model_signal)
-    raw_model_alt_signal = (cut_model_alt_signal .- mean(cut_model_alt_signal)) ./ std(cut_model_alt_signal)
+    #raw_model_alt_signal = (cut_model_alt_signal .- mean(cut_model_alt_signal)) ./ std(cut_model_alt_signal)
     model_flt_beta = get_beta_data(cut_model_signal)
     model_flt_beta = (model_flt_beta .- mean(model_flt_beta)) ./ std(model_flt_beta)
 
-    df_psd_data = CSV.read("data/psd.csv", DataFrame)   
+    #df_psd_data = CSV.read("data/psd.csv", DataFrame)   
 
     run_spec(raw_model_signal, true)
     run_hilbert_pdf(raw_model_signal, true)
 
     run_beta_burst(model_flt_beta, true)
-    run_plv(raw_model_signal, raw_model_alt_signal, true)
+    #run_plv(raw_model_signal, raw_model_alt_signal, true)
 
     plot(1:length(raw_model_signal), raw_model_signal, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
     savefig("plots/optim/model/raw.png")
@@ -375,7 +377,7 @@ function main_byrne()
 
     N=2
     W=[Float32(0.0) Float32(1.0); Float32(1.0) Float32(0.0)]
-    etta=Float32(1.0)
+    etta=Float32(0.5)
 
     tau = Float32(p[1])
     ex = Float32(p[2])
@@ -412,21 +414,26 @@ function main_byrne()
     #plot_byrne_single(df)
     
     #zscore
-    cut_model_signal = df.R[1].rV_E[100:end]
-    cut_model_alt_signal = df.R[2].rV_E[100:end]
+    cut_model_signal = df.R[1].rV_E[1:end]
+    cut_model_alt_signal = df.R[2].rV_E[1:end]
     raw_model_signal = (cut_model_signal .- mean(cut_model_signal)) ./ std(cut_model_signal)
     raw_model_alt_signal = (cut_model_alt_signal .- mean(cut_model_alt_signal)) ./ std(cut_model_alt_signal)
-    model_flt_beta = get_beta_data(cut_model_signal)
-    model_flt_beta = (model_flt_beta .- mean(model_flt_beta)) ./ std(model_flt_beta)  
- 
-    run_spec(raw_model_signal, true)
-    run_hilbert_pdf(raw_model_signal, true)
- 
-    run_beta_burst(model_flt_beta, true)
-    run_plv(raw_model_signal, raw_model_alt_signal, true)
- 
+
     plot(1:length(raw_model_signal), raw_model_signal, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
     savefig("plots/optim/model/raw.png")
+
+
+    model_flt_beta = get_beta_data(cut_model_signal)
+    model_flt_beta = (model_flt_beta .- mean(model_flt_beta)) ./ std(model_flt_beta)  
+
+    plot_path = "plots/optim/model"
+    csv_path = "data/model"
+ 
+    run_spec(raw_model_signal, plot_path, csv_path)
+    run_hilbert_pdf(raw_model_signal, true)
+ 
+    run_beta_burst(model_flt_beta, plot_path, csv_path)
+    run_plv(raw_model_signal, raw_model_alt_signal, plot_path, csv_path)
  
     plot(1:length(model_flt_beta), model_flt_beta, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
     savefig("plots/optim/model/flt_beta.png")
@@ -446,5 +453,5 @@ function main_stim()
     savefig("plot2.png")
 end
 
-main_raf()
-plot_data_model_features()
+main_byrne()
+#plot_data_model_features()

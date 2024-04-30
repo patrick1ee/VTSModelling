@@ -2,7 +2,7 @@ module analysis
 
     include("./Signal.jl")
 
-    using ApproxFun, CSV, DataFrames, DSP, FFTW, HDF5, Interpolations, KissSmoothing, LPVSpectral, LsqFit, NaNStatistics, Plots, StatsBase, Statistics
+    using ApproxFun, Base.Filesystem, CSV, DataFrames, DSP, FFTW, HDF5, Interpolations, KissSmoothing, LPVSpectral, LsqFit, NaNStatistics, Plots, StatsBase, Statistics
 
     using .Signal: get_bandpassed_signal, get_beta_data, get_pow_spec, get_hilbert_amplitude_pdf, get_burst_durations, get_signal_phase
 
@@ -161,19 +161,14 @@ module analysis
         return data_flt_beta
     end
 
-    function run_spec(sig, model; freqs=Nothing, sampling_rate=1000)
+    function run_spec(sig, plot_path, csv_path; freqs=Nothing, sampling_rate=1000)
         freq, power = get_pow_spec(sig, freqs, sampling_rate)
-        plot(freq, power, xlabel="frequency (Hz)", xlim=(6, 55), xticks=6:4:55, size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
 
         csv_df = DataFrame(Frequency = freq, PSD = abs.(power))
+        CSV.write(csv_path*"/psd.csv", csv_df)
 
-        if model
-            savefig("plots/optim/model/psd.png")
-            CSV.write("data/psd-m.csv", csv_df)
-        else 
-            savefig("plots/optim/data/psd.png")
-            CSV.write("data/psd.csv", csv_df)
-        end
+        plot(freq, power, xlabel="frequency (Hz)", xlim=(6, 55), xticks=6:4:55, size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+        savefig(plot_path*"/psd.png")
     end
 
     function run_hilbert_pdf(signal, model, bandwidth=0.1)
@@ -192,48 +187,34 @@ module analysis
 
     end
 
-    function run_beta_burst(signal, model, bandwidth=0.1)
+    function run_beta_burst(signal, plot_path, csv_path, bandwidth=0.1)
         x, y, ha = get_hilbert_amplitude_pdf(signal, bandwidth=bandwidth)
         S, N = denoise(convert(AbstractArray{Float64}, ha))
 
-        plot(x, y, xlabel="amplitude", ylim=(0.0, 2.0), xlim=(0, 6), xticks=0:2:6, yticks=0:0.5:2.0, size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
         csv_df = DataFrame(x=x,y=y)
-        
-        if model
-            savefig("plots/optim/model/beta-hpdf.png")
-            CSV.write("data/beta-hpdf-m.csv", csv_df)
-        else 
-            savefig("plots/optim/data/beta-hpdf.png")
-            CSV.write("data/beta-hpdf.csv", csv_df)
-        end
+        CSV.write(csv_path*"/bapdf.csv", csv_df)
+
+        plot(x, y, xlabel="amplitude", ylim=(0.0, 2.0), xlim=(0, 6), xticks=0:2:6, yticks=0:0.5:2.0, size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+        savefig(plot_path*"/bapdf.png")
+
+        csv_df = DataFrame(x=1:length(signal),y=S)
+        CSV.write(csv_path*"/bamp.csv", csv_df)
 
         plot(1:length(signal), S, xlabel="time", size=(500,500), xlim=(0, 10000), xticks=0:2000:10000, linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
-        csv_df = DataFrame(x=1:length(signal),y=S)
-        
-        if model
-            savefig("plots/optim/model/beta-hamp.png")
-            CSV.write("data/beta-hamp-m.csv", csv_df)
-        else 
-            savefig("plots/optim/data/beta-hamp.png")
-            CSV.write("data/beta-hamp.csv", csv_df)
-        end
+        savefig(plot_path*"/bamp.png")
 
         bx, by, burst_durations = get_burst_durations(S)
-        plot(bx, by, xlabel="duration", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+
         csv_df = DataFrame(x=bx,y=by)
-        
-        if model
-            savefig("plots/optim/model/beta-dur-pdf.png")
-            CSV.write("data/beta-dur-pdf-m.csv", csv_df)
-        else 
-            savefig("plots/optim/data/beta-dur-pdf.png")
-            CSV.write("data/beta-dur-hpdf.csv", csv_df)
-        end
+        CSV.write(csv_path*"/bdpdf.csv", csv_df)
+
+        plot(bx, by, xlabel="duration", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+        savefig(plot_path*"/bdpdf.png")
     end
 
-    function run_plv(s1, s2, model)
+    function run_plv(s1, s2, plot_path, csv_path)
         plvs = []
-        freqs = 6:0.1:29
+        freqs = 6:29
         for f in freqs
             s1f = get_bandpassed_signal(s1, f-0.5, f+0.5)
             s2f = get_bandpassed_signal(s2, f-0.5, f+0.5)
@@ -245,38 +226,25 @@ module analysis
 
         p1 = get_signal_phase(s1)
         p2 = get_signal_phase(s2)
+
+        csv_df = DataFrame(x=1:length(s1),y=p1)
+        CSV.write(csv_path*"/p1.csv", csv_df)
         
         plot(1:length(s1), p1)
-        csv_df = DataFrame(x=1:length(s1),y=p1)
-        if model
-            savefig("plots/optim/model/phase-1.png")
-            CSV.write("data/phase-1-m.csv", csv_df)
-        else 
-            savefig("plots/optim/data/phase-1.png")
-            CSV.write("data/phase-1.csv", csv_df)
-        end
+        savefig(plot_path*"/p1.png")
 
+        csv_df = DataFrame(x=1:length(s2),y=p2)
+        CSV.write(csv_path*"/p2.csv", csv_df)
+        
         plot(1:length(s2), p2)
-        csv_df = DataFrame(x=1:length(s1),y=p2)
-        if model
-            savefig("plots/optim/model/phase-2.png")
-            CSV.write("data/phase-1-m.csv", csv_df)
-        else 
-            savefig("plots/optim/data/phase-2.png")
-            CSV.write("data/phase-1.csv", csv_df)
-        end
+        savefig(plot_path*"/p2.png")
 
-        plot(freqs, plvs)
         S, N = denoise(convert(AbstractArray{Float64}, plvs))
         csv_df = DataFrame(Frequency = freqs, PLV = S)
-        if model
-            savefig("plots/optim/model/plvs.png")
-            CSV.write("data/plvs-m.csv", csv_df)
-        else 
-            savefig("plots/optim/data/plvs.png")
-            CSV.write("data/plvs.csv", csv_df)
-        end
+        CSV.write(csv_path*"/plvs.csv", csv_df)
 
+        plot(freqs, plvs)
+        savefig(plot_path*"/plvs.png")
     end
 
     function parse_eeg_data(data, CONST_REF_CHAN)
@@ -391,6 +359,82 @@ module analysis
         return xPSD, yPSD, xBAPDF, yBAPDF, xBDPF, yBDPF, xPLV, yPLV
     end
 
+    function analyse_all_flat()
+        data_path = "Patrick_data"
+
+        # Define the size of the time-window for computing the ERP (event-related potential)
+        ERP_tWidth = 1  # [sec]
+        ERP_tOffset = ERP_tWidth / 2  # [sec]
+        ERP_LOWPASS_FILTER = 30  # set to nan if you want to deactivate it
+
+        POW_SPECTRUM_FREQS = 6:55  # in Hz
+
+        fcount = 0
+
+        data_path = "Patrick_data/"
+        for (root, dirs, files) in walkdir(data_path)
+            for file in files
+                if endswith(file, ".hdf5")
+                    full = joinpath(root, file)
+                    P = split(full, "/")[2]
+                    F = split(split(full, "/")[3], ".")[1]
+                    
+                    csv_path_parent = "data/"*P
+                    csv_path = "data/"*P*"/"*F
+
+                    if !isdir(csv_path_parent)
+                        mkdir(csv_path_parent)
+                    end
+                    if !isdir(csv_path)
+                        mkdir(csv_path)
+                    end
+                    
+                    plot_path_parent = "plots/data/"*P
+                    plot_path = "plots/data/"*P*"/"*F
+                    if !isdir(plot_path_parent)
+                        mkdir(plot_path_parent)
+                    end
+                    if !isdir(plot_path)
+                        mkdir(plot_path)
+                    end
+
+                    fid = h5open(full, "r")
+                    data = read(fid["EEG"])
+                    close(fid)
+
+                    CONST_REF_CHAN = "CP1_local"
+                    CONST_ALT_CHAN = "CP2_local"
+
+                    data_outlierRem = parse_eeg_data(data, CONST_REF_CHAN)
+                    data_outlierRem_alt = parse_eeg_data(data, CONST_ALT_CHAN)
+
+                    data_flt_beta = get_beta_data(data_outlierRem)
+                    data_raw = data_outlierRem
+                    data_raw_alt = data_outlierRem_alt
+
+                    #zscore
+                    data_raw = (data_raw .- mean(data_raw)) ./ std(data_raw)
+                    data_flt_beta = (data_flt_beta .- mean(data_flt_beta)) ./ std(data_flt_beta)
+
+                    data_raw_alt = (data_raw_alt .- mean(data_raw_alt)) ./ std(data_raw_alt)
+                    
+                    run_spec(data_raw, plot_path, csv_path)
+                    run_beta_burst(data_flt_beta, plot_path, csv_path)
+                    run_plv(data_raw, data_raw_alt, plot_path, csv_path)
+
+                    plot(1:length(data_raw), data_raw, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+                    savefig(plot_path*"/raw.png")
+                    plot(1:length(data_flt_beta), data_flt_beta, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+                    savefig(plot_path*"/flt-beta.png")
+
+                    fcount += 1
+                    println("Processed $fcount files.")
+                end
+            end
+        end
+        return
+    end
+
     function analyse()
         data_raw, data_flt_beta, data_raw_alt = init_data()
         #zscore
@@ -417,4 +461,4 @@ module analysis
     end
 end
 
-#analysis.analyse()
+#analysis.analyse_all_flat()
