@@ -14,22 +14,20 @@ module Oscilltrack
         cosv::Float64
         
         phase_target::Float64
-        phase_search_targets::Vector{Float64}
         w::Float64
         gamma::Float64
         suppression_reset::Int
         suppression_count::Int
         is_prev_above_thrs::Bool
         
-        function Oscilltracker(freq_target::Float64, phase_target::Vector{Float64}, freq_sample::Float64, suppression_cycle::Float64, gamma::Union{Float64, Nothing}=nothing, phase_search::Bool=false)
-            phase_target = phase_target[1]
-            phase_search_targets = phase_search ? phase_target[2:end] : []
+        function Oscilltracker(freq_target::Float64, phase_target::Float64, freq_sample::Float64, suppression_cycle::Float64, gamma::Union{Float64, Nothing}=nothing)
+            phase_target = phase_target
             w = 2 * π * freq_target / freq_sample
             gamma = isnothing(gamma) ? 125 / freq_sample : gamma
             suppression_reset = round(Int, suppression_cycle * freq_sample / freq_target)
             suppression_count = 0
             is_prev_above_thrs = false
-            new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, phase_target, phase_search_targets, w, gamma, suppression_reset, suppression_count, is_prev_above_thrs)
+            new(0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 1.0, phase_target, w, gamma, suppression_reset, suppression_count, is_prev_above_thrs)
         end
     end
 
@@ -91,36 +89,13 @@ module Oscilltrack
         
         return is_stim
     end
-
-    function next_phase!(osc::Oscilltracker)
-        if isempty(osc.phase_search_targets)
-            return nothing
-        end
-
-        osc.phase_target = osc.phase_search_targets[1]
-        osc.phase_search_targets = osc.phase_search_targets[2:end]
-        
-        osc.a = 0.0
-        osc.b = 0.0
-        osc.re = 0.0
-        osc.im = 0.0
-        osc.theta = 0.0
-        osc.sinv = 0.0
-        osc.cosv = 1.0
-        
-        osc.suppression_count = 0
-        osc.is_prev_above_thrs = false
-        
-        return osc.phase_target
-    end
-
+    
     function test_oscilltrack()
-        SR = 1000.0
+        SR = 750.0
         gamma_param = 0.1 # or 0.05
         OT_suppress = 0.3
-        target_phase = 0.0
+        target_phase = pi / 4.0
         target_freq = 10.0
-        phase_search = false
 
         A = 1.0
         f = 10.0
@@ -134,14 +109,18 @@ module Oscilltrack
             S[i] = A * sin(f * 2 * pi * range_t[i] + phase) + base
         end
 
-        osc = Oscilltracker(target_freq, [target_phase], SR, OT_suppress, gamma_param, phase_search)
+        osc = Oscilltracker(target_freq, target_phase, SR, OT_suppress, gamma_param)
 
         phase = zeros(Lt)
+        stim = zeros(Lt)
         for i in 1:Lt
             update!(osc, S[i])
             phase[i] = get_phase(osc)
+            stim[i] = decide_stim(osc)
         end
-        plot(range_t, [S, phase])
+        plot(range_t, [S, phase, stim])
         savefig("test_oscilltrack.png")
     end
 end
+
+Oscilltrack.test_oscilltrack()
