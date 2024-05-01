@@ -147,19 +147,17 @@ function cost_bb_bc(params)
 end
 
 function cost_bb(params)
+    csv_path = "data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1"
     SR = 1000
 
-    psd_df = CSV.read("data/psd.csv", DataFrame)
+    psd_df = CSV.read(csv_path*"/psd.csv", DataFrame)
     xPSD = psd_df[!, 1]
     yPSDdat = psd_df[!, 2]
-
-    beta_amp_pdf_df = CSV.read("data/beta-hpdf.csv", DataFrame)
+    beta_amp_pdf_df = CSV.read(csv_path*"/bapdf.csv", DataFrame)
     yBAPDFdat = beta_amp_pdf_df[!, 2]
-
-    beta_dur_pdf_df = CSV.read("data/beta-dur-hpdf.csv", DataFrame)
+    beta_dur_pdf_df = CSV.read(csv_path*"/bdpdf.csv", DataFrame)
     yBDPDFdat = beta_dur_pdf_df[!, 2]
-
-    plv_df = CSV.read("data/plvs.csv", DataFrame)
+    plv_df = CSV.read(csv_path*"/plvs.csv", DataFrame)
     yPLVdat = plv_df[!, 2]
 
     N=2
@@ -668,7 +666,7 @@ function Optim()
     println(sol)
 end
 
-Optim()
+#Optim()
 
 #p_range = [(23.09, 23.11), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0), (0.0, 10.0), (-2.0, 10.0), (-10.0, 2.0)]
 #res = bboptimize(cost_bb_bc; SearchRange=p_range)

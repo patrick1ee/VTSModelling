@@ -155,10 +155,9 @@ module Signal
         OT_suppress = 0.3
         target_phase = 0.0
         target_freq = 10.0
-        phase_search = false
 
         Lt = length(signal)
-        osc = Oscilltracker(target_freq, [target_phase], SR, OT_suppress, gamma_param, phase_search)
+        osc = Oscilltracker(target_freq, target_phase, SR, OT_suppress, gamma_param)
         phase = zeros(Lt)
         for i in 1:Lt
             update!(osc, Float64(signal[i]))

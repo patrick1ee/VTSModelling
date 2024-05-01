@@ -7,7 +7,7 @@ include("./Stimulation.jl")
 include("./Signal.jl")
 include("./Optim.jl")
 
-using ControlSystems, CSV, CurveFit, DataFrames, DSP, FFTW, KernelDensity, LsqFit, NeuralDynamics, Plots, Statistics, StatsBase
+using ControlSystems, CSV, CurveFit, DataFrames, DSP, FFTW, KernelDensity, LsqFit, Measures, NeuralDynamics, Plots, Statistics, StatsBase
 using .RafalModel: create_rafal_model, simulate_rafal_model
 using .BenoitModel: create_benoit_model, simulate_benoit_model
 using .ByrneModel: create_byrne_pop, create_byrne_pop_EI, create_byrne_network, create_if_pop, simulate_if_pop, simulate_byrne_EI_network
@@ -186,6 +186,30 @@ function run_max_min(m, simulate, range_t, dt, range_theta_input, theta_const, i
    return DataFrame(theta=range_theta_input, rE_max=rE_max, rE_min=rE_min, input_pop=input_pop)
 end
 
+function run_max_min_wc_net(model, range_t, dt, range_theta_input, theta_const, input_pop)
+    Lt = length(range_t)
+    Lte = length(range_theta_input)
+    rE_max = zeros(Lte)
+    rE_min = zeros(Lte)
+
+    window = [0.05, 0.1]
+
+    for i in 1:Lte
+        thE = input_pop == "E" ? fill(range_theta_input[i], Lt) : fill(theta_const, Lt)
+        thI = input_pop == "I" ? fill(range_theta_input[i], Lt) : fill(theta_const, Lt)
+
+        theta_E = [thE, thE]
+        theta_I = [thI, thI]
+        stim = zeros(Lt)
+        df = run_act_time(model, simulate_benoit_model, range_t, dt, theta_E, theta_I, stim)
+
+        rE = df.R[1].rE
+        rE_max[i], _ = findmax(rE[trunc(Int, window[1] / dt):trunc(Int, window[2] / dt)])
+        rE_min[i], _ = findmin(rE[trunc(Int, window[1] / dt):trunc(Int, window[2] / dt)])
+    end
+   return DataFrame(theta=range_theta_input, rE_max=rE_max, rE_min=rE_min, input_pop=input_pop)
+end
+
 function run_act_time(m, simulate, range_t, dt, theta_E, theta_I, stim_response)
     theta_E_t = [fill(i, length(range_t)) for i in theta_E]
     theta_I_t = [fill(i, length(range_t)) for i in theta_I]
@@ -277,7 +301,7 @@ function main_raf()
     #p = [0.0165082, 4.79867, 7.75704, 9.93353, 2.27035, -0.115528, -1.50204]
 
     #P20
-    p = [0.016686, 1.30585, 4.18644, 7.88385, 5.09226, 0.04, 0.496913, -0.904573]
+    #p = [0.016686, 1.30585, 4.18644, 7.88385, 5.09226, 0.04, 0.496913, -0.904573]
     good_guess = [0.01684509590268135, 2.808759927749634, 2.9388251304626465, 5.182344913482666, 8.326308250427246, 0.595751166343689, 0.3267395496368408]
     #p = good_guess
 
@@ -287,6 +311,11 @@ function main_raf()
     #P7
     #p = [0.016783476, 7.9688745, 0.50424606, 8.942622, 5.3960485, 0.473071, -8.26678]
 
+    #P20 noise
+    #p = [0.0167907, 1.84502, 8.10264, 4.90234, 3.76054, 0.0673752, 0.275149, -2.27837]
+
+    #Alpha oscillations
+    p = [0.016, 2.4, 2.0, 2.0, 4.0, 0.0, 0.5, 0.0]
 
     W=[Float32(0.0) Float32(1.0); Float32(1.0) Float32(0.0)]
     etta=Float32(0.5)
@@ -308,6 +337,9 @@ function main_raf()
     dt = 0.001
     range_t = 0.0:dt:T
     sampling_rate = 1.0 / dt
+
+    run_max_min_wc_net(model, range_t, dt, 1.0:0.1:2.0, 0.0, "E")
+    return
 
     #E_A = 0.1
     #E_f = 4
@@ -350,28 +382,106 @@ function main_raf()
     #plot_hilbert_amplitude_pdf(df.R[1].rE, df.T[1], sampling_rate)
 
     #zscore
-    cut_model_signal = df.R[1].rE[100:end]
-    cut_model_alt_signal = df.R[2].rE[100:end]
+    cut_model_signal = df.R[1].rE[1:end]
+    cut_model_alt_signal = df.R[2].rE[1:end]
     raw_model_signal = (cut_model_signal .- mean(cut_model_signal)) ./ std(cut_model_signal)
     raw_model_alt_signal = (cut_model_alt_signal .- mean(cut_model_alt_signal)) ./ std(cut_model_alt_signal)
 
-    plot(1:length(raw_model_signal), raw_model_signal, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
-    savefig("plots/optim/model/raw.png")
+    #plot(1:length(raw_model_signal), raw_model_signal, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+    #savefig("plots/optim/model/raw.png")
 
-    model_flt_beta = get_beta_data(cut_model_signal)
-    model_flt_beta = (model_flt_beta .- mean(model_flt_beta)) ./ std(model_flt_beta)  
+    #model_flt_beta = get_beta_data(cut_model_signal)
+    #model_flt_beta = (model_flt_beta .- mean(model_flt_beta)) ./ std(model_flt_beta)  
 
     plot_path = "plots/optim/model"
     csv_path = "data/model"
  
     run_spec(raw_model_signal, plot_path, csv_path)
-    run_hilbert_pdf(raw_model_signal, true)
+    #run_hilbert_pdf(raw_model_signal, true)
  
-    run_beta_burst(model_flt_beta, plot_path, csv_path)
-    run_plv(raw_model_signal, raw_model_alt_signal, plot_path, csv_path)
+    #run_beta_burst(model_flt_beta, plot_path, csv_path)
+    #run_plv(raw_model_signal, raw_model_alt_signal, plot_path, csv_path)
  
-    plot(1:length(model_flt_beta), model_flt_beta, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
-    savefig("plots/optim/model/flt_beta.png")
+    #plot(1:length(model_flt_beta), model_flt_beta, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+    #savefig("plots/optim/model/flt_beta.png")
+
+    # E-I plots
+    raw_model_signal_I = (df.R[1].rI .- mean(df.R[1].rI)) ./ std(df.R[1].rI)
+    raw_model_alt_signal_I = (df.R[2].rI .- mean(df.R[2].rI)) ./ std(df.R[2].rI)
+    plot(
+        range_t[1:1000],
+        raw_model_signal[1:1000], 
+        xlabel="Time (s)", 
+        title="Activity of Node 1",
+        xticks=0:0.2:1.0,
+        yticks=-2.0:1.0:2.0,
+        size=(1000, 450),
+        margin=10mm,
+        linewidth=3,
+        xtickfont=14,
+        ytickfont=14,
+        titlefont=14,
+        guidefont=14,
+        tickfont=14,
+        color=2,
+        legend=false
+        )
+    plot!(
+        range_t[1:1000],
+        raw_model_signal_I[1:1000],
+        xlabel="Time (s)",
+        title="Activity of Node 1",
+        xticks=0:0.2:1.0,
+        yticks=-2.0:1.0:2.0,
+        size=(1000, 450),
+        margin=10mm,
+        linewidth=3,
+        xtickfont=14,
+        ytickfont=14,
+        titlefont=14,
+        guidefont=14,
+        tickfont=14,
+        color=1,
+        legend=false
+        )
+    savefig("plots/optim/model/raw-slice-1.png")
+    plot(
+        range_t[1:1000],
+        raw_model_alt_signal[1:1000], 
+        xlabel="Time (s)", 
+        title="Activity of Node 2",
+        xticks=0:0.2:1.0,
+        yticks=-2.0:1.0:2.0,
+        size=(1000, 450),
+        margin=10mm,
+        linewidth=3,
+        xtickfont=14,
+        ytickfont=14,
+        titlefont=14,
+        guidefont=14,
+        tickfont=14,
+        color=2,
+        legend=false
+        )
+    plot!(
+        range_t[1:1000],
+        raw_model_alt_signal_I[1:1000],
+        xlabel="Time (s)",
+        title="Activity of Node 2",
+        xticks=0:0.2:1.0,
+        yticks=-2.0:1.0:2.0,
+        size=(1000, 450),
+        margin=10mm,
+        linewidth=3,
+        xtickfont=14,
+        ytickfont=14,
+        titlefont=14,
+        guidefont=14,
+        tickfont=14,
+        color=1,
+        legend=false
+        )
+    savefig("plots/optim/model/raw-slice-2.png")
 end
 
 function main_byrne()
@@ -463,4 +573,4 @@ end
 #plot_data_model_features("data/P7/06_02_2024_P7_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1")
 
 main_raf()
-plot_data_model_features("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1")
+#plot_data_model_features("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1")
