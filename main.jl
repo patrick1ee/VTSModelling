@@ -94,16 +94,16 @@ function plot_avg_if_activity(df)
     savefig("plots/myplot.png")
 end
 
-function plot_data_model_features()
+function plot_data_model_features(csv_data_path)
     # Load data
-    df_psd_data = CSV.read("data/psd.csv", DataFrame)   
-    df_psd_model = CSV.read("data/psd-m.csv", DataFrame)
-    df_beta_amp_pdf_data = CSV.read("data/beta-hpdf.csv", DataFrame)
-    df_beta_amp_pdf_model = CSV.read("data/beta-hpdf-m.csv", DataFrame)
-    df_beta_dur_pdf_data = CSV.read("data/beta-dur-hpdf.csv", DataFrame)
-    df_beta_dur_pdf_model = CSV.read("data/beta-dur-pdf-m.csv", DataFrame)
-    df_plvs_data = CSV.read("data/plvs.csv", DataFrame)
-    df_plvs_model = CSV.read("data/plvs-m.csv", DataFrame)
+    df_psd_data = CSV.read(csv_data_path*"/psd.csv", DataFrame)   
+    df_psd_model = CSV.read("data/model/psd.csv", DataFrame)
+    df_beta_amp_pdf_data = CSV.read(csv_data_path*"/bapdf.csv", DataFrame)
+    df_beta_amp_pdf_model = CSV.read("data/model/bapdf.csv", DataFrame)
+    df_beta_dur_pdf_data = CSV.read(csv_data_path*"/bdpdf.csv", DataFrame)
+    df_beta_dur_pdf_model = CSV.read("data/model/bdpdf.csv", DataFrame)
+    df_plvs_data = CSV.read(csv_data_path*"/plvs.csv", DataFrame)
+    df_plvs_model = CSV.read("data/model/plvs.csv", DataFrame)
 
     plot(
         [df_psd_data[!, 1], df_psd_model[!, 1]],
@@ -277,7 +277,7 @@ function main_raf()
     #p = [0.0165082, 4.79867, 7.75704, 9.93353, 2.27035, -0.115528, -1.50204]
 
     #P20
-    p = [0.016686, 1.30585, 4.18644, 7.88385, 5.09226, 0.496913, -0.904573]
+    p = [0.016686, 1.30585, 4.18644, 7.88385, 5.09226, 0.04, 0.496913, -0.904573]
     good_guess = [0.01684509590268135, 2.808759927749634, 2.9388251304626465, 5.182344913482666, 8.326308250427246, 0.595751166343689, 0.3267395496368408]
     #p = good_guess
 
@@ -296,12 +296,13 @@ function main_raf()
     w_EI = Float32(p[3])
     w_IE = Float32(p[4])
     beta = Float32(p[5])
-    thE_A = Float32(p[6])
-    thI_A = Float32(p[7])
-    thE_B = Float32(p[6])
-    thI_B = Float32(p[7])
+    noise_dev = Float32(p[6])
+    thE_A = Float32(p[7])
+    thI_A = Float32(p[8])
+    thE_B = Float32(p[7])
+    thI_B = Float32(p[8])
 
-    model = create_benoit_model(N, W, etta, tau_E, tau_I, w_EE, w_EI, w_IE, beta)
+    model = create_benoit_model(N, W, etta, tau_E, tau_I, w_EE, w_EI, w_IE, beta, noise_dev)
     
     T = 100.0
     dt = 0.001
@@ -350,23 +351,25 @@ function main_raf()
 
     #zscore
     cut_model_signal = df.R[1].rE[100:end]
-    #cut_model_alt_signal = df.R[2].rE[100:end]
+    cut_model_alt_signal = df.R[2].rE[100:end]
     raw_model_signal = (cut_model_signal .- mean(cut_model_signal)) ./ std(cut_model_signal)
-    #raw_model_alt_signal = (cut_model_alt_signal .- mean(cut_model_alt_signal)) ./ std(cut_model_alt_signal)
-    model_flt_beta = get_beta_data(cut_model_signal)
-    model_flt_beta = (model_flt_beta .- mean(model_flt_beta)) ./ std(model_flt_beta)
-
-    #df_psd_data = CSV.read("data/psd.csv", DataFrame)   
-
-    run_spec(raw_model_signal, true)
-    run_hilbert_pdf(raw_model_signal, true)
-
-    run_beta_burst(model_flt_beta, true)
-    #run_plv(raw_model_signal, raw_model_alt_signal, true)
+    raw_model_alt_signal = (cut_model_alt_signal .- mean(cut_model_alt_signal)) ./ std(cut_model_alt_signal)
 
     plot(1:length(raw_model_signal), raw_model_signal, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
     savefig("plots/optim/model/raw.png")
 
+    model_flt_beta = get_beta_data(cut_model_signal)
+    model_flt_beta = (model_flt_beta .- mean(model_flt_beta)) ./ std(model_flt_beta)  
+
+    plot_path = "plots/optim/model"
+    csv_path = "data/model"
+ 
+    run_spec(raw_model_signal, plot_path, csv_path)
+    run_hilbert_pdf(raw_model_signal, true)
+ 
+    run_beta_burst(model_flt_beta, plot_path, csv_path)
+    run_plv(raw_model_signal, raw_model_alt_signal, plot_path, csv_path)
+ 
     plot(1:length(model_flt_beta), model_flt_beta, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
     savefig("plots/optim/model/flt_beta.png")
 end
@@ -374,6 +377,9 @@ end
 function main_byrne()
     # Parameters (time in ms)
     p = [23.1, 0.5, 0.5, 0.5, 0.5, 0.5, 0.0, 0.0]
+
+    #F1 - data/P7/06_02_2024_P7_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1
+    #p = [23.0953, 0.762638, 0.657167, 0.347283, 0.0464327, 0.5, 3.92163, 1.51794]
 
     N=2
     W=[Float32(0.0) Float32(1.0); Float32(1.0) Float32(0.0)]
@@ -453,5 +459,8 @@ function main_stim()
     savefig("plot2.png")
 end
 
-main_byrne()
-#plot_data_model_features()
+#main_byrne()
+#plot_data_model_features("data/P7/06_02_2024_P7_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1")
+
+main_raf()
+plot_data_model_features("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1")

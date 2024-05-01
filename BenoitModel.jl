@@ -19,26 +19,25 @@ module BenoitModel
         nodes::Array{Node, 1}
         W::Matrix{Float32}
         etta::Float32
+        noise_dev::Float32
     end
 
     struct NodeActivity
         rE::Array{Float32, 1}
         rI::Array{Float32, 1}
     end
-    
-    NOISE_DEV = 0.0457
 
-    function create_benoit_model(N::Int64, W::Matrix{Float32}, etta::Float32, tau_E::Float32, tau_I::Float32, w_EE::Float32, w_EI::Float32, w_IE::Float32, beta::Float32)
-        nodes = [Node(tau_E, tau_I, w_EE, w_EI, w_IE, beta, WienerProcess(0.0,NOISE_DEV, 1.0), WienerProcess(0.0,NOISE_DEV, 1.0)) for _ in 1:N]
-        return Network(nodes, W, etta)
+    function create_benoit_model(N::Int64, W::Matrix{Float32}, etta::Float32, tau_E::Float32, tau_I::Float32, w_EE::Float32, w_EI::Float32, w_IE::Float32, beta::Float32, noise_dev::Float32)
+        nodes = [Node(tau_E, tau_I, w_EE, w_EI, w_IE, beta, WienerProcess(0.0,noise_dev, 1.0), WienerProcess(0.0,noise_dev, 1.0)) for _ in 1:N]
+        return Network(nodes, W, etta, noise_dev)
     end
 
-    function create_benoit_node(tau_E::Float32, tau_I::Float32, w_EE::Float32, w_EI::Float32, w_IE::Float32, beta::Float32)
-        return Node(tau_E, tau_I, w_EE, w_EI, w_IE, beta, WienerProcess(0.0,NOISE_DEV, 1.0), WienerProcess(0.0,NOISE_DEV, 1.0))
+    function create_benoit_node(tau_E::Float32, tau_I::Float32, w_EE::Float32, w_EI::Float32, w_IE::Float32, beta::Float32, noise_dev::Float32)
+        return Node(tau_E, tau_I, w_EE, w_EI, w_IE, beta, WienerProcess(0.0,noise_dev, 1.0), WienerProcess(0.0,noise_dev, 1.0))
     end
 
-    function create_benoit_network(nodes, W::Matrix{Float32}, etta::Float32)
-        return Network([nodes[i] for i in 1:length(nodes)], W, etta)
+    function create_benoit_network(nodes, W::Matrix{Float32}, etta::Float32, noise_dev::Float32)
+        return Network([nodes[i] for i in 1:length(nodes)], W, etta, noise_dev)
     end
 
     function sigmoid(x, beta)
@@ -84,8 +83,8 @@ module BenoitModel
                 rWE[j][i] = n.WE[i]
                 rWI[j][i] = n.WI[i]
     
-                R[j].rE[i] = R[j].rE[i-1] + drE + NOISE_DEV * (n.WE[i] - n.WE[i - 1])
-                R[j].rI[i] = R[j].rI[i-1] + drI + NOISE_DEV * (n.WI[i] - n.WI[i - 1])
+                R[j].rE[i] = R[j].rE[i-1] + drE + N.noise_dev * (n.WE[i] - n.WE[i - 1])
+                R[j].rI[i] = R[j].rI[i-1] + drI + N.noise_dev * (n.WI[i] - n.WI[i - 1])
             end
         end
         return R

@@ -43,12 +43,23 @@ function run_byrne_net(N, simulate, range_t, T, dt, theta_E, theta_I, stim)
     theta_I_t = [fill(i, length(range_t)) for i in theta_I]
 
     R = simulate(N, range_t, dt, theta_E_t, theta_I_t, stim)
-    T = [0.0(dt/1000.0):(T/1000.0) for i in 1:length(theta_E)]   # Convert to s
+    T = [range_t for i in 1:length(theta_E)]   # Convert to s
     return DataFrame(T=T, R=R, theta_E=theta_E_t, theta_I=theta_I_t)
 end
 
 function cost_bb_bc(params)
+    csv_path = "data/P7/06_02_2024_P7_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1"
     SR = 1000
+
+    psd_df = CSV.read(csv_path*"/psd.csv", DataFrame)
+    xPSD = psd_df[!, 1]
+    yPSDdat = psd_df[!, 2]
+    beta_amp_pdf_df = CSV.read(csv_path*"/bapdf.csv", DataFrame)
+    yBAPDFdat = beta_amp_pdf_df[!, 2]
+    beta_dur_pdf_df = CSV.read(csv_path*"/bdpdf.csv", DataFrame)
+    yBDPDFdat = beta_dur_pdf_df[!, 2]
+    plv_df = CSV.read(csv_path*"/plvs.csv", DataFrame)
+    yPLVdat = plv_df[!, 2]
 
     N=2
     W=[Float32(0.0) Float32(1.0); Float32(1.0) Float32(0.0)]
@@ -68,7 +79,7 @@ function cost_bb_bc(params)
     net = create_byrne_network(N, W, etta, E, I, ks_p, kv_p, alpha_p)
     
     #timescale now ms
-    T = 10000.0
+    T = 100000.0
     dt = 1.0  
     range_t = 0.0:dt:T
         
@@ -85,20 +96,6 @@ function cost_bb_bc(params)
     theta_I = [theta_I_p, theta_I_p]
     stim = response
     df= run_byrne_net(net, simulate_byrne_EI_network, range_t, T, dt, theta_E, theta_I, [])
-
-    psd_df = CSV.read("data/psd.csv", DataFrame)
-    xPSD = psd_df[!, 1]
-    yPSDdat = psd_df[!, 2]
-
-    beta_amp_pdf_df = CSV.read("data/beta-hpdf.csv", DataFrame)
-    yBAPDFdat = beta_amp_pdf_df[!, 2]
-
-    beta_dur_pdf_df = CSV.read("data/beta-dur-hpdf.csv", DataFrame)
-    yBDPDFdat = beta_dur_pdf_df[!, 2]
-
-    plv_df = CSV.read("data/plvs.csv", DataFrame)
-    yPLVdat = plv_df[!, 2]
-
     #zscore
     Eproc = df.R[1].rV_E 
     Eproc = Eproc .- mean(Eproc) / std(Eproc)
@@ -119,7 +116,7 @@ function cost_bb_bc(params)
         yPSDdat = yPSDdat[1:length(yPSDmod)]
     end
     
-    coeffs = [1.6, 0.8, 0.8, 0.8]
+    coeffs = [1.0, 1.0, 1.0, 1.0]
     cost1 = 1.0
     cost2 = 1.0
     cost3 = 1.0
@@ -672,7 +669,6 @@ end
 
 #Optim()
 
-#p_byrnes = [(23.09, 23.11), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (-2.0, 10.0), (-10.0, 2.0)]
-#init_param_bc_mir(p_byrnes)
-
+#p_range = [(23.09, 23.11), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0), (0.0, 10.0), (-2.0, 10.0), (-10.0, 2.0)]
+#res = bboptimize(cost_bb_bc; SearchRange=p_range)
 
