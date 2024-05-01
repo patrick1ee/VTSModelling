@@ -168,16 +168,17 @@ function cost_bb(params)
 
     tau_E = Float32(params[1])
     tau_I = Float32(params[1])
-    w_EE = Float32(1.30585)
-    w_EI = Float32(4.18644)
-    w_IE = Float32(7.88385)
-    beta = Float32(5.09226)
-    theta_E_A_param = Float32(params[2])
-    theta_I_A_param = Float32(params[3])
-    theta_E_B_param = Float32(params[2])
-    theta_I_B_param = Float32(params[3])
+    w_EE = Float32(params[2])
+    w_EI = Float32(params[3])
+    w_IE = Float32(params[4])
+    beta = Float32(params[5])
+    noise_dev = Float32(params[6])
+    theta_E_A_param = Float32(params[7])
+    theta_I_A_param = Float32(params[8])
+    theta_E_B_param = Float32(params[7])
+    theta_I_B_param = Float32(params[8])
 
-    model = create_benoit_model(N, W, etta, tau_E, tau_I, w_EE, w_EI, w_IE, beta)
+    model = create_benoit_model(N, W, etta, tau_E, tau_I, w_EE, w_EI, w_IE, beta, noise_dev)
     
     T = 100.0
     dt = 0.001
@@ -622,17 +623,17 @@ end
 function Optim()
     #
     #df_csv_r = CSV.read("data/params-wc-mir-1.3-0.9-0.9-0.9.csv", DataFrame)
-    #good_guess = [0.016686, 1.30585, 4.18644, 7.88385, 5.09226, 0.496913, -0.904573]
+    good_guess = [0.016686, 1.30585, 4.18644, 7.88385, 5.09226, 0.04, 0.496913, -0.904573]
     #for i in 1:nrow(df_csv_r)
     #    push!(good_guess, [v for v in values(df_csv_r[i,:])])
     #end
     #  0 theta_I
     #good_guess = [0.016523340716958046,5.432121276855469,3.8098607063293457,6.350203514099121,6.220411777496338,0.5953848361968994]
-    #p_range=[(0.016, 0.017), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (-2.0, 10.0)]
+    p_range=[(0.016, 0.017), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (0.0, 0.3), (-2.0, 10.0), (-10.0, 2.0)]
 
     #Fixed W,beta
-    good_guess = [0.016686, 0.496913, -0.904573]
-    p_range=[(0.016, 0.017), (0.0, 10.0), (-2.0, 10.0)]
+    #good_guess = [0.016686, 0.496913, -0.904573]
+    #p_range=[(0.016, 0.017), (0.0, 10.0), (-2.0, 10.0)]
 
     res = bboptimize(cost_bb; SearchRange=p_range)
     return
@@ -667,7 +668,7 @@ function Optim()
     println(sol)
 end
 
-#Optim()
+Optim()
 
 #p_range = [(23.09, 23.11), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0), (0.0, 10.0), (-2.0, 10.0), (-10.0, 2.0)]
 #res = bboptimize(cost_bb_bc; SearchRange=p_range)
