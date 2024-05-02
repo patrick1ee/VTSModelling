@@ -2,7 +2,7 @@ module ByrneModel
 
     using DiffEqNoiseProcess, Distributions, JSON, Plots
 
-    export ByrneModel, create_byrne_pop, create_byrne_pop_EI, create_byrne_network, create_if_pop, simulate_if_pop, simulate_byrne_EI_network
+    export ByrneModel, create_byrne_pop, create_byrne_pop_EI, create_byrne_node, create_byrne_network, create_if_pop, simulate_if_pop, simulate_byrne_EI_network
 
     struct IFPopulation
         N::Int32
@@ -17,26 +17,24 @@ module ByrneModel
     end
 
     struct EIPopulation
-        ex::Float32
-        gamma::Float32 # Hetereogeneity parameter
         tau::Float32
+        ex::Float32
+        kv::Float32
+        gamma::Float32 # Hetereogeneity parameter
     end
 
     struct Node
-        kv_EE::Float32
-        kv_EI::Float32
-        kv_IE::Float32
-        kv_II::Float32
+        E::EIPopulation
+        I::EIPopulation
         ks_EE::Float32
         ks_EI::Float32
         ks_IE::Float32
         ks_II::Float32
+        kv_EI::Float32  #Two-way gap junction
         alpha_EE::Float32
         alpha_EI::Float32
         alpha_IE::Float32
         alpha_II::Float32
-        E::EIPopulation
-        I::EIPopulation
         WE
         WI
     end
@@ -45,6 +43,7 @@ module ByrneModel
         nodes::Array{Node, 1}
         W::Matrix{Float32}
         etta::Float32
+        noise_dev::Float32
     end
 
     struct NodeActivity
@@ -61,15 +60,16 @@ module ByrneModel
         return Population(ex, ks, kv, gamma, tau, alpha)
     end
 
-    function create_byrne_pop_EI(ex::Float32, gamma::Float32, tau::Float32)
-        return EIPopulation(ex, gamma, tau)
+    function create_byrne_pop_EI(tau::Float32, ex::Float32, kv::Float32, gamma::Float32)
+        return EIPopulation(tau, ex, kv, gamma)
     end
 
-    NOISE_DEV = 0.0457
+    function create_byrne_node(E::EIPopulation, I::EIPopulation, ks_EE::Float32, ks_EI::Float32, ks_IE::Float32, ks_II::Float32, kv_EI::Float32, alpha_EE::Float32, alpha_EI::Float32, alpha_IE::Float32, alpha_II::Float32, noise_dev::Float32)
+        return Node(E, I, ks_EE, ks_EI, ks_IE, ks_II, kv_EI, alpha_EE, alpha_EI, alpha_IE, alpha_II, WienerProcess(0.0,noise_dev, 1.0), WienerProcess(0.0,noise_dev, 1.0))
+    end
 
-    function create_byrne_network(N::Int64, W::Matrix{Float32}, etta::Float32, E::EIPopulation, I::EIPopulation, ks::Float32, kv::Float32, alpha::Float32)
-        nodes = [Node(kv, kv, kv, kv, ks, ks, ks, ks, alpha, alpha, alpha, alpha, E, I, WienerProcess(0.0,NOISE_DEV, 1.0), WienerProcess(0.0,NOISE_DEV, 1.0)) for _ in 1:N]
-        return Network(nodes, W, etta)
+    function create_byrne_network(nodes, W::Matrix{Float32}, etta::Float32, noise_dev::Float32)
+        return Network(nodes, W, etta, noise_dev)
     end
 
     function create_if_pop(N, ex::Float32, ks::Float32, kv::Float32, gamma::Float32, tau::Float32, alpha::Float32, vth, vr)
@@ -163,22 +163,27 @@ module ByrneModel
                 end
                 C = N.etta * C / length(N.nodes)
 
-                drR_E = (dt / n.E.tau) * (-R[j].rR_E[i-1] * (n.kv_EE + n.kv_EI) + 2 * R[j].rR_E[i-1] * R[j].rV_E[i-1] + n.E.gamma / (pi * n.E.tau) + theta_E[j][i-1])
-                drR_I = (dt / n.I.tau) * (-R[j].rR_I[i-1] * (n.kv_IE + n.kv_II) + 2 * R[j].rR_I[i-1] * R[j].rV_I[i-1] + n.I.gamma / (pi * n.I.tau) + theta_I[j][i-1])
+                drR_E = (dt / n.E.tau) * (-R[j].rR_E[i-1] * (n.E.kv + n.kv_EI) + 2 * R[j].rR_E[i-1] * R[j].rV_E[i-1] + n.E.gamma / (pi * n.E.tau) + theta_E[j][i-1])
+                drR_I = (dt / n.I.tau) * (-R[j].rR_I[i-1] * (n.I.kv + n.kv_EI) + 2 * R[j].rR_I[i-1] * R[j].rV_I[i-1] + n.I.gamma / (pi * n.I.tau) + theta_I[j][i-1])
 
                 U_E = n.ks_EE *get_synaptic_activity(n.alpha_EE, dt, R[j].rR_E[i-1]) + n.ks_EI *get_synaptic_activity(n.alpha_EI, dt, R[j].rR_E[i-1])
                 U_I = n.ks_IE *get_synaptic_activity(n.alpha_IE, dt, R[j].rR_I[i-1]) + n.ks_II *get_synaptic_activity(n.alpha_II, dt, R[j].rR_I[i-1])
 
                 drV_E = (dt / n.E.tau) * (n.E.ex + R[j].rV_E[i-1]^2 - pi^2 * n.E.tau^2 * R[j].rR_E[i-1]^2 + U_E + n.kv_EI * (R[j].rV_I[i-1] - R[j].rV_E[i-1]))
-                drV_I = (dt / n.I.tau) * (n.I.ex + R[j].rV_I[i-1]^2 - pi^2 * n.I.tau^2 * R[j].rR_I[i-1]^2 + U_I + n.kv_IE * (R[j].rV_E[i-1] - R[j].rV_I[i-1]))
+                drV_I = (dt / n.I.tau) * (n.I.ex + R[j].rV_I[i-1]^2 - pi^2 * n.I.tau^2 * R[j].rR_I[i-1]^2 + U_I + n.kv_EI * (R[j].rV_E[i-1] - R[j].rV_I[i-1]))
+                
+                if i < 100
+                    #println("dR_E: " * string(drR_E) * " dR_I: " * string(drR_I) * " U_E: " * string(U_E) * " U_I: " * string(U_I) * " dV_E: " * string(drV_E) * " dV_I: " * string(drV_I))
+                end
 
                 accept_step!(n.WE, dt, uWE[j], pWE[j])
                 accept_step!(n.WI, dt, uWI[j], pWI[j])
 
+
                 R[j].rR_E[i] = R[j].rR_E[i-1] + drR_E
                 R[j].rR_I[i] = R[j].rR_I[i-1] + drR_I
-                R[j].rV_E[i] = R[j].rV_E[i-1] + drV_E + NOISE_DEV * (n.WE[i] - n.WE[i - 1])
-                R[j].rV_I[i] = R[j].rV_I[i-1] + drV_I + NOISE_DEV * (n.WI[i] - n.WI[i - 1])
+                R[j].rV_E[i] = R[j].rV_E[i-1] + drV_E + N.noise_dev * (n.WE[i] - n.WE[i - 1])
+                R[j].rV_I[i] = R[j].rV_I[i-1] + drV_I + N.noise_dev * (n.WI[i] - n.WI[i - 1])
 
                 R[j].rZ_E[i] = abs(get_kuramoto_parameter(R[j].rR_E[i], R[j].rV_E[i], n.E.tau))
                 R[j].rZ_I[i] = abs(get_kuramoto_parameter(R[j].rR_I[i], R[j].rV_I[i], n.I.tau))

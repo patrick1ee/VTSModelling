@@ -2,7 +2,7 @@ module analysis
 
     include("./Signal.jl")
 
-    using ApproxFun, Base.Filesystem, CSV, DataFrames, DSP, FFTW, HDF5, Interpolations, KissSmoothing, LPVSpectral, LsqFit, NaNStatistics, Plots, StatsBase, Statistics
+    using ApproxFun, Base.Filesystem, CSV, DataFrames, DSP, FFTW, HDF5, Interpolations, KissSmoothing, LPVSpectral, LsqFit, Measures, NaNStatistics, Plots, StatsBase, Statistics
 
     using .Signal: get_bandpassed_signal, get_beta_data, get_pow_spec, get_hilbert_amplitude_pdf, get_burst_durations, get_signal_phase
 
@@ -167,7 +167,24 @@ module analysis
         csv_df = DataFrame(Frequency = freq, PSD = abs.(power))
         CSV.write(csv_path*"/psd.csv", csv_df)
 
-        plot(freq, power, xlabel="frequency (Hz)", xlim=(6, 55), xticks=6:4:55, size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+        plot(
+            freq,
+            power, 
+            legend=false,
+            xlabel="Frequency (Hz)",
+            title="Power Spectral Density",
+            c=2,
+            size=(500, 500),
+            xlim=(6, 30),
+            xticks=10:10:30,
+            linewidth=5,
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            margin=2.5mm
+        )
         savefig(plot_path*"/psd.png")
     end
 

@@ -10,7 +10,7 @@ include("./Optim.jl")
 using ControlSystems, CSV, CurveFit, DataFrames, DSP, FFTW, KernelDensity, LsqFit, Measures, NeuralDynamics, Plots, Statistics, StatsBase
 using .RafalModel: create_rafal_model, simulate_rafal_model
 using .BenoitModel: create_benoit_model, simulate_benoit_model
-using .ByrneModel: create_byrne_pop, create_byrne_pop_EI, create_byrne_network, create_if_pop, simulate_if_pop, simulate_byrne_EI_network
+using .ByrneModel: create_byrne_pop, create_byrne_pop_EI, create_byrne_node, create_byrne_network, create_if_pop, simulate_if_pop, simulate_byrne_EI_network
 using .Stimulation: create_stimulus, create_stim_response, yousif_transfer
 
 using .Signal: get_pow_spec, get_hilbert_amplitude_pdf, get_beta_data
@@ -49,12 +49,98 @@ function plot_spec(df, N, sampling_rate)
         #F_I = fftshift(fft(df.R[i].rI .- mean(df.R[i].rI)))
         #push!(plots, plot(freqs, [abs.(F_E), abs.(F_I)], xlabel="f", xlim=(0, +10), xticks=0:2:10) )
 
-        plot(freqs, abs.(F_E ./ (1.5*10e3)), xlabel="frequency (Hz)", xlim=(0, +50), xticks=0:10:50, yticks=0:0.5:1.6, size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+        plot(freqs, abs.(F_E ./ (1.5*10e3)), xlabel="frequency (Hz)", xlim=(0, +50), xticks=0:10:50, yticks=0:0.5:1.6, size=(500,500), linewidth=5, xtickfont=22, ytickfont=22, legend=false, titlefont=22, guidefont=22, tickfont=22, legendfont=22)
         csv_df = DataFrame(Frequency = freqs, PSD = abs.(F_E))
         #CSV.write("data/psd-"*string(i)*".csv", csv_df)
     end
     #plot(plots..., layout=(1, N), size=(700*N,750))
     savefig("plots/spec.png")
+end
+
+function plot_two_spec()
+    # Load data
+    df_psd_1= CSV.read("data/model/psd-16.csv", DataFrame)   
+    df_psd_2 = CSV.read("data/model/psd.csv", DataFrame)
+
+    plot(
+        df_psd_1[!, 1],
+        df_psd_1[!, 2],
+        title="Power Spectral Density",
+        xlabel="Frequency (Hz)",
+        xlim=(6, 40),
+        xticks=10:10:40,
+        size=(500,500),
+        linewidth=4,
+        xtickfont=12,
+        ytickfont=12,
+        label="τ=0.016",
+        titlefont=12,
+        guidefont=12,
+        tickfont=12,
+        c=3
+    )
+    plot!(
+        df_psd_2[!, 1],
+        df_psd_2[!, 2],
+        title="Power Spectral Density",
+        xlabel="Frequency (Hz)",
+        xlim=(6, 40),
+        xticks=10:10:40,
+        size=(500,500),
+        linewidth=2,
+        xtickfont=12,
+        ytickfont=12,
+        label="τ=0.008",
+        titlefont=12,
+        guidefont=12,
+        tickfont=12,
+        c=2,
+        linestyle=:dot
+    )
+    savefig("plots/optim/model/psd-pair.png")
+
+end
+
+function plot_md_spec()
+    df_psd_1= CSV.read("data/model/psd-16.csv", DataFrame)   
+    df_psd_2 = CSV.read("data/P14/12_02_2024_P14_Ch14_FRQ=10Hz_FULL_CL_phase=0_OL11Hz_STIM_EC_v2/psd.csv", DataFrame)
+
+    plot(
+        df_psd_1[!, 1],
+        df_psd_1[!, 2],
+        title="Power Spectral Density",
+        xlabel="Frequency (Hz)",
+        xlim=(6, 40),
+        xticks=10:10:40,
+        size=(500,500),
+        linewidth=4,
+        xtickfont=12,
+        ytickfont=12,
+        label="τ=0.016",
+        titlefont=12,
+        guidefont=12,
+        tickfont=12,
+        c=3
+    )
+    plot!(
+        df_psd_2[!, 1],
+        df_psd_2[!, 2],
+        title="Power Spectral Density",
+        xlabel="Frequency (Hz)",
+        xlim=(6, 40),
+        xticks=10:10:40,
+        size=(500,500),
+        linewidth=2,
+        xtickfont=12,
+        ytickfont=12,
+        label="τ=0.008",
+        titlefont=12,
+        guidefont=12,
+        tickfont=12,
+        c=2,
+        linestyle=:dot
+    )
+    savefig("plots/optim/model/psd-pair.png")
 end
 
 function plot_oscill_time(df, sampling_rate, spec=false)
@@ -77,8 +163,25 @@ end
 
 
 function plot_max_min(df)
-    plot(df.theta, [df.rE_max, df.rE_min], label=["max" "min"], xlabel="theta_I"*df.input_pop[1], ylabel="E amplitude")
-    savefig("plots/myplot.png")
+    plot(
+        df.theta,
+        [df.rE_max, df.rE_min], 
+        legend=false,
+        xlabel=df.input_pop[1]*" input",
+        ylabel="E amplitude", 
+        c=2,
+        size=(500, 500),
+        xticks=0:0.5:1.5,
+        xlim=(0, 1.5),
+        linewidth=5,
+        xtickfont=12,
+        ytickfont=12,
+        titlefont=12,
+        guidefont=12,
+        tickfont=12,
+        margin=2.5mm
+        )
+    savefig("plots/diss/wc-oscill-1-bif.png")
 end
 
 function plot_byrne_single(df)
@@ -110,13 +213,13 @@ function plot_data_model_features(csv_data_path)
         [df_psd_data[!, 2], df_psd_model[!, 2]],
         xlabel="frequency (Hz)",
         size=(500,500),
-        linewidth=3,
-        xtickfont=16,
-        ytickfont=16,
+        linewidth=5,
+        xtickfont=22,
+        ytickfont=22,
         label=["data" "model"],
-        titlefont=16,
-        guidefont=16,
-        tickfont=16,
+        titlefont=22,
+        guidefont=22,
+        tickfont=22,
     )
     savefig("plots/optim/comb/psd.png")
 
@@ -126,13 +229,13 @@ function plot_data_model_features(csv_data_path)
         [df_beta_amp_pdf_data[!, 2], df_beta_amp_pdf_model[!, 2]],
         xlabel="amplitude",
         size=(500,500),
-        linewidth=3, 
-        xtickfont=16,
-        ytickfont=16,
+        linewidth=5, 
+        xtickfont=22,
+        ytickfont=22,
         label=["data" "model"],
-        titlefont=16, 
-        guidefont=16,
-        tickfont=16,
+        titlefont=22, 
+        guidefont=22,
+        tickfont=22,
     )
     savefig("plots/optim/comb/beta-amp-pdf.png")
 
@@ -141,13 +244,13 @@ function plot_data_model_features(csv_data_path)
         [df_beta_dur_pdf_data[!, 2], df_beta_dur_pdf_model[!, 2]],
         xlabel="duration (s)",
         size=(500,500),
-        linewidth=3, 
-        xtickfont=16,
-        ytickfont=16,
+        linewidth=5, 
+        xtickfont=22,
+        ytickfont=22,
         label=["data" "model"],
-        titlefont=16, 
-        guidefont=16,
-        tickfont=16,
+        titlefont=22, 
+        guidefont=22,
+        tickfont=22,
     )
     savefig("plots/optim/comb/beta-dur-pdf.png")
 
@@ -156,13 +259,13 @@ function plot_data_model_features(csv_data_path)
         [df_plvs_data[!, 2], df_plvs_model[!, 2]],
         xlabel="frequency (Hz)",
         size=(500,500),
-        linewidth=3,
-        xtickfont=16,
-        ytickfont=16,
+        linewidth=5,
+        xtickfont=22,
+        ytickfont=22,
         label=["data" "model"],
-        titlefont=16,
-        guidefont=16,
-        tickfont=16
+        titlefont=22,
+        guidefont=22,
+        tickfont=22
     )
     savefig("plots/optim/comb/plv.png")
 end
@@ -186,13 +289,13 @@ function run_max_min(m, simulate, range_t, dt, range_theta_input, theta_const, i
    return DataFrame(theta=range_theta_input, rE_max=rE_max, rE_min=rE_min, input_pop=input_pop)
 end
 
-function run_max_min_wc_net(model, range_t, dt, range_theta_input, theta_const, input_pop)
+function run_max_min_wc_net(model, simulate, range_t, dt, range_theta_input, theta_const, input_pop)
     Lt = length(range_t)
     Lte = length(range_theta_input)
     rE_max = zeros(Lte)
     rE_min = zeros(Lte)
 
-    window = [0.05, 0.1]
+    window = [0.5, 1.0]
 
     for i in 1:Lte
         thE = input_pop == "E" ? fill(range_theta_input[i], Lt) : fill(theta_const, Lt)
@@ -200,10 +303,9 @@ function run_max_min_wc_net(model, range_t, dt, range_theta_input, theta_const, 
 
         theta_E = [thE, thE]
         theta_I = [thI, thI]
-        stim = zeros(Lt)
-        df = run_act_time(model, simulate_benoit_model, range_t, dt, theta_E, theta_I, stim)
+        R = simulate(model, range_t, dt, theta_E, theta_I)
 
-        rE = df.R[1].rE
+        rE = R[1].rE
         rE_max[i], _ = findmax(rE[trunc(Int, window[1] / dt):trunc(Int, window[2] / dt)])
         rE_min[i], _ = findmin(rE[trunc(Int, window[1] / dt):trunc(Int, window[2] / dt)])
     end
@@ -242,7 +344,7 @@ function run_byrne_net(N, simulate, range_t, T, dt, theta_E, theta_I, stim)
     theta_I_t = [fill(i, length(range_t)) for i in theta_I]
 
     R = simulate(N, range_t, dt, theta_E_t, theta_I_t, stim)
-    T = [0.0(dt/1000.0):(T/1000.0) for i in 1:length(theta_E)]   # Convert to s
+    T = [0.0:dt:T for i in 1:length(theta_E)]   # Convert to s
     return DataFrame(T=T, R=R, theta_E=theta_E_t, theta_I=theta_I_t)
 end
 
@@ -253,14 +355,14 @@ end
 
 function plot_hilbert_amplitude_pdf(signal::Array{Float32, 1},T, sampling_rate, bandwidth=0.1)
     x, y, ha = get_hilbert_amplitude_pdf(signal, bandwidth=bandwidth)
-    plot(x, y, xlabel="amplitude", ylim=(0.0, 1.0), xlim=(0, 6), xticks=0:2:6, yticks=0:0.5:1.0, size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+    plot(x, y, xlabel="amplitude", ylim=(0.0, 1.0), xlim=(0, 6), xticks=0:2:6, yticks=0:0.5:1.0, size=(500,500), linewidth=5, xtickfont=22, ytickfont=22, legend=false, titlefont=22, guidefont=22, tickfont=22, legendfont=22)
     savefig("plots/hilbert_amp_pdf.png")
     plot(T, ha, xlabel="Amplitude", ylabel="Amplitude")
     savefig("plots/hilbert_amp.png")
 
     freqs = fftshift(fftfreq(length(T), sampling_rate))
     F_A = fftshift(fft(ha))
-    plot(freqs, abs.(F_A ./ (1.5*10e3)), xlabel="envelope frequency (Hz)", xlim=(0, +10), ylim=(0.0, 1.0), linewidth=3, xticks=0:5:10, yticks=0:0.5:1.5, size=(500,500), xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+    plot(freqs, abs.(F_A ./ (1.5*10e3)), xlabel="envelope frequency (Hz)", xlim=(0, +10), ylim=(0.0, 1.0), linewidth=5, xticks=0:5:10, yticks=0:0.5:1.5, size=(500,500), xtickfont=22, ytickfont=22, legend=false, titlefont=22, guidefont=22, tickfont=22, legendfont=22)
     savefig("plots/hilbert_psd.png")
 
     csv_df = DataFrame(x=x,y=y)
@@ -315,7 +417,7 @@ function main_raf()
     #p = [0.0167907, 1.84502, 8.10264, 4.90234, 3.76054, 0.0673752, 0.275149, -2.27837]
 
     #Alpha oscillations
-    p = [0.016, 2.4, 2.0, 2.0, 4.0, 0.0, 0.5, 0.0]
+    p = [0.016, 2.4, 2.0, 2.0, 4.0, 0.75, 0.5, 0.0]
 
     W=[Float32(0.0) Float32(1.0); Float32(1.0) Float32(0.0)]
     etta=Float32(0.5)
@@ -338,8 +440,9 @@ function main_raf()
     range_t = 0.0:dt:T
     sampling_rate = 1.0 / dt
 
-    run_max_min_wc_net(model, range_t, dt, 1.0:0.1:2.0, 0.0, "E")
-    return
+    #df = run_max_min_wc_net(model, simulate_benoit_model, range_t, dt, 0.0:0.01:2.0, 0.0, "E")
+    #plot_max_min(df)
+    #return
 
     #E_A = 0.1
     #E_f = 4
@@ -356,7 +459,7 @@ function main_raf()
 
     stim=create_stimulus(A, f, range_t)
     response=create_stim_response(stim, range_t)
-    #plot(range_t, response, xlabel="time (ms)", ylabel="V", size=(500,500), xlim=(0, 0.1), xticks=0:0.02:0.1, linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+    #plot(range_t, response, xlabel="time (ms)", ylabel="V", size=(500,500), xlim=(0, 0.1), xticks=0:0.02:0.1, linewidth=5, xtickfont=22, ytickfont=22, legend=false, titlefont=22, guidefont=22, tickfont=22, legendfont=22)
     #savefig("jul-test.png")
 
     stim = zeros(length(range_t))
@@ -387,7 +490,7 @@ function main_raf()
     raw_model_signal = (cut_model_signal .- mean(cut_model_signal)) ./ std(cut_model_signal)
     raw_model_alt_signal = (cut_model_alt_signal .- mean(cut_model_alt_signal)) ./ std(cut_model_alt_signal)
 
-    #plot(1:length(raw_model_signal), raw_model_signal, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+    #plot(1:length(raw_model_signal), raw_model_signal, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=5, xtickfont=22, ytickfont=22, legend=false, titlefont=22, guidefont=22, tickfont=22, legendfont=22)
     #savefig("plots/optim/model/raw.png")
 
     #model_flt_beta = get_beta_data(cut_model_signal)
@@ -402,130 +505,154 @@ function main_raf()
     #run_beta_burst(model_flt_beta, plot_path, csv_path)
     #run_plv(raw_model_signal, raw_model_alt_signal, plot_path, csv_path)
  
-    #plot(1:length(model_flt_beta), model_flt_beta, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+    #plot(1:length(model_flt_beta), model_flt_beta, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=5, xtickfont=22, ytickfont=22, legend=false, titlefont=22, guidefont=22, tickfont=22, legendfont=22)
     #savefig("plots/optim/model/flt_beta.png")
 
     # E-I plots
     raw_model_signal_I = (df.R[1].rI .- mean(df.R[1].rI)) ./ std(df.R[1].rI)
     raw_model_alt_signal_I = (df.R[2].rI .- mean(df.R[2].rI)) ./ std(df.R[2].rI)
-    plot(
+    p1 = plot(
         range_t[1:1000],
         raw_model_signal[1:1000], 
         xlabel="Time (s)", 
         title="Activity of Node 1",
-        xticks=0:0.2:1.0,
-        yticks=-2.0:1.0:2.0,
-        size=(1000, 450),
+        xticks=0:200.0:1000.0,
+        yticks=-2:2:2,
+        ylim=(-3, 3),
+        size=(1000, 1000),
         margin=10mm,
-        linewidth=3,
-        xtickfont=14,
-        ytickfont=14,
-        titlefont=14,
-        guidefont=14,
-        tickfont=14,
+        linewidth=5,
+        xtickfont=22,
+        ytickfont=22,
+        titlefont=22,
+        guidefont=22,
+        tickfont=22,
         color=2,
-        legend=false
+        legend=:topright,
+        label="Excitatory",
+        legendfont=22,
         )
     plot!(
+        p1,
         range_t[1:1000],
         raw_model_signal_I[1:1000],
         xlabel="Time (s)",
         title="Activity of Node 1",
-        xticks=0:0.2:1.0,
-        yticks=-2.0:1.0:2.0,
-        size=(1000, 450),
+        xticks=0:200.0:1000.0,
+        yticks=-2:2:2,
+        ylim=(-3, 3),
+        size=(1000, 1000),
         margin=10mm,
-        linewidth=3,
-        xtickfont=14,
-        ytickfont=14,
-        titlefont=14,
-        guidefont=14,
-        tickfont=14,
+        linewidth=5,
+        xtickfont=22,
+        ytickfont=22,
+        titlefont=22,
+        guidefont=22,
+        tickfont=22,
         color=1,
-        legend=false
+        legend=:topright,
+        label="Inhibitory",
+        legendfont=22,
         )
-    savefig("plots/optim/model/raw-slice-1.png")
-    plot(
+    p2 = plot(
         range_t[1:1000],
         raw_model_alt_signal[1:1000], 
         xlabel="Time (s)", 
         title="Activity of Node 2",
-        xticks=0:0.2:1.0,
-        yticks=-2.0:1.0:2.0,
-        size=(1000, 450),
+        xticks=0:200.0:1000.0,
+        yticks=-2:2:2,
+        ylim=(-3, 3),
+        size=(1000, 1000),
         margin=10mm,
-        linewidth=3,
-        xtickfont=14,
-        ytickfont=14,
-        titlefont=14,
-        guidefont=14,
-        tickfont=14,
+        linewidth=5,
+        xtickfont=22,
+        ytickfont=22,
+        titlefont=22,
+        guidefont=22,
+        tickfont=22,
         color=2,
-        legend=false
+        legend=false,
         )
     plot!(
+        p2,
         range_t[1:1000],
         raw_model_alt_signal_I[1:1000],
         xlabel="Time (s)",
         title="Activity of Node 2",
-        xticks=0:0.2:1.0,
-        yticks=-2.0:1.0:2.0,
-        size=(1000, 450),
+        xticks=0:200.0:1000.0,
+        yticks=-2:2:2,
+        ylim=(-3, 3),
+        size=(1000, 1000),
         margin=10mm,
-        linewidth=3,
-        xtickfont=14,
-        ytickfont=14,
-        titlefont=14,
-        guidefont=14,
-        tickfont=14,
+        linewidth=5,
+        xtickfont=22,
+        ytickfont=22,
+        titlefont=22,
+        guidefont=22,
+        tickfont=22,
+        legend=false,
         color=1,
-        legend=false
         )
-    savefig("plots/optim/model/raw-slice-2.png")
+    plot(p1, p2, layout=(2,1))
+    savefig("plots/diss/wc-oscill-alpha-noise.png")
 end
 
 function main_byrne()
     # Parameters (time in ms)
-    p = [23.1, 0.5, 0.5, 0.5, 0.5, 0.5, 0.0, 0.0]
+    #p = [23.1, 1.0, 0.5, 0.5, 0.5, 0.5, 0.0, 0.0, 0.0]
+    #p = [16.0, 2.0, 1.0, 1.0, 0.5, 0.5, 0.0, 0.0, 0.0]
 
     #F1 - data/P7/06_02_2024_P7_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1
-    #p = [23.0953, 0.762638, 0.657167, 0.347283, 0.0464327, 0.5, 3.92163, 1.51794]
+    #p = [23.0953, 0.762638, 0.657167, 0.347283, 0.0464327, 0.5, 0.0, 3.92163, 1.51794]
 
     N=2
     W=[Float32(0.0) Float32(1.0); Float32(1.0) Float32(0.0)]
-    etta=Float32(0.5)
+    etta=Float32(0.0)
 
-    tau = Float32(p[1])
-    ex = Float32(p[2])
-    ks = Float32(p[3])
-    kv = Float32(p[4])
-    gamma = Float32(p[5])
-    alpha = Float32(p[6])
+    tau = Float32(1000.0)
+    ex_E = Float32(5.0)
+    ex_I = Float32(-3.0)
+    kv_E = Float32(0.5)
+    kv_I = Float32(0.5)
+    
+    ks_EE = Float32(15.0)
+    ks_EI = Float32(-15.0)
+    ks_IE = Float32(25.0)
+    ks_II = Float32(-15.0)
+    kv_EI = Float32(0.0)
+    alpha_EE = Float32(0.2)
+    alpha_EI = Float32(0.07)
+    alpha_IE = Float32(0.1)
+    alpha_II = Float32(0.06)
+    gamma = Float32(0.5)
+    noise_dev = Float32(0.0)
 
-    thE_A = Float32(p[7])
-    thI_A = Float32(p[8])
+    thE_A = Float32(0.0)
+    thI_A = Float32(0.0)
 
     vth = 1.000
     vr = -1.000
 
     #p = create_byrne_pop(ex, ks, kv, gamma, tau, alpha)
     #p = create_if_pop(1000, ex, ks, kv, gamma, tau, alpha, vth, vr)
-    E = create_byrne_pop_EI(ex, gamma, tau)
-    I = create_byrne_pop_EI(ex, gamma, tau)
-    N = create_byrne_network(N, W, etta, E, I, ks, kv, alpha)
+    E = create_byrne_pop_EI(tau, ex_E, kv_E, gamma)
+    I = create_byrne_pop_EI(tau, ex_I, kv_I, gamma)
+    N1 = create_byrne_node(E, I, ks_EE, ks_EI, ks_IE, ks_II, kv_EI, alpha_EE, alpha_EI, alpha_IE, alpha_II, noise_dev)
+    N2 = create_byrne_node(E, I, ks_EE, ks_EI, ks_IE, ks_II, kv_EI, alpha_EE, alpha_EI, alpha_IE, alpha_II, noise_dev)
+    model = create_byrne_network([N1, N2], W, etta, noise_dev)
     
     #timescale now ms
     T = 100000.0
-    dt = 1.0  
+    dt = 1.0 
     range_t = 0.0:dt:T
     
     theta_E = [thE_A, thE_A]
     theta_I = [thI_A, thI_A]
     #df = run_byrne_single(p, simulate_byrne_pop, range_t, dt)
     #df = run_byrne_if(p, simulate_if_pop, range_t, dt)
-    df= run_byrne_net(N, simulate_byrne_EI_network, range_t, T, dt, theta_E, theta_I, [])
+    df= run_byrne_net(model, simulate_byrne_EI_network, range_t, T, dt, theta_E, theta_I, [])
 
-    #timescale now s
+    #timescale now ms
 
     #plot_byrne_single(df)
     
@@ -535,24 +662,105 @@ function main_byrne()
     raw_model_signal = (cut_model_signal .- mean(cut_model_signal)) ./ std(cut_model_signal)
     raw_model_alt_signal = (cut_model_alt_signal .- mean(cut_model_alt_signal)) ./ std(cut_model_alt_signal)
 
-    plot(1:length(raw_model_signal), raw_model_signal, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
-    savefig("plots/optim/model/raw.png")
+    #plot(1:length(raw_model_signal), raw_model_signal, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=5, xtickfont=22, ytickfont=22, legend=false, titlefont=22, guidefont=22, tickfont=22, legendfont=22)
+    #savefig("plots/optim/model/raw.png")
 
-
-    model_flt_beta = get_beta_data(cut_model_signal)
-    model_flt_beta = (model_flt_beta .- mean(model_flt_beta)) ./ std(model_flt_beta)  
+    #model_flt_beta = get_beta_data(cut_model_signal)
+    #model_flt_beta = (model_flt_beta .- mean(model_flt_beta)) ./ std(model_flt_beta)  
 
     plot_path = "plots/optim/model"
     csv_path = "data/model"
+
+    df_csv = DataFrame(t=range_t, raw=raw_model_alt_signal)
+    CSV.write(csv_path*"/raw.csv", df_csv)
  
     run_spec(raw_model_signal, plot_path, csv_path)
-    run_hilbert_pdf(raw_model_signal, true)
+    #run_hilbert_pdf(raw_model_signal, true)
  
-    run_beta_burst(model_flt_beta, plot_path, csv_path)
-    run_plv(raw_model_signal, raw_model_alt_signal, plot_path, csv_path)
+    #run_beta_burst(model_flt_beta, plot_path, csv_path)
+    #run_plv(raw_model_signal, raw_model_alt_signal, plot_path, csv_path)
  
-    plot(1:length(model_flt_beta), model_flt_beta, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
-    savefig("plots/optim/model/flt_beta.png")
+    #plot(1:length(model_flt_beta), model_flt_beta, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=5, xtickfont=22, ytickfont=22, legend=false, titlefont=22, guidefont=22, tickfont=22, legendfont=22)
+    #savefig("plots/optim/model/flt_beta.png")
+
+    # E-I plots
+    raw_model_signal_I = (df.R[1].rV_I .- mean(df.R[1].rV_I)) ./ std(df.R[1].rV_I)
+    raw_model_alt_signal_I = (df.R[2].rV_I .- mean(df.R[2].rV_I)) ./ std(df.R[2].rV_I)
+    p1 = plot(
+        range_t[1:10000],
+        raw_model_signal[1:10000], 
+        xlabel="Time (s)", 
+        title="Activity of Node 1",
+        xticks=0:200.0:10000.0,
+        size=(1000, 1000),
+        margin=10mm,
+        linewidth=5,
+        xtickfont=22,
+        ytickfont=22,
+        titlefont=22,
+        guidefont=22,
+        tickfont=22,
+        color=2,
+        legend=:topright,
+        label="Excitatory",
+        legendfont=22,
+        )
+    plot!(
+        p1,
+        range_t[1:10000],
+        raw_model_signal_I[1:10000],
+        xlabel="Time (s)",
+        title="Activity of Node 1",
+        xticks=0:2000.0:10000.0,
+        size=(1000, 1000),
+        margin=10mm,
+        linewidth=5,
+        xtickfont=22,
+        ytickfont=22,
+        titlefont=22,
+        guidefont=22,
+        tickfont=22,
+        color=1,
+        legend=:topright,
+        label="Inhibitory",
+        legendfont=22,
+        )
+    p2 = plot(
+        range_t[1:10000],
+        raw_model_alt_signal[1:10000], 
+        xlabel="Time (s)", 
+        title="Activity of Node 2",
+        size=(1000, 1000),
+        margin=10mm,
+        linewidth=5,
+        xtickfont=22,
+        ytickfont=22,
+        titlefont=22,
+        guidefont=22,
+        tickfont=22,
+        color=2,
+        legend=false,
+        )
+    plot!(
+        p2,
+        range_t[1:10000],
+        raw_model_alt_signal_I[1:10000],
+        xlabel="Time (s)",
+        title="Activity of Node 2",
+        xticks=0:2000.0:10000.0,
+        size=(1000, 1000),
+        margin=10mm,
+        linewidth=5,
+        xtickfont=22,
+        ytickfont=22,
+        titlefont=22,
+        guidefont=22,
+        tickfont=22,
+        legend=false,
+        color=1,
+        )
+    plot(p1, p2, layout=(2,1))
+    savefig("plots/diss/bc-oscill-alpha.png")
 
 end
 
@@ -569,8 +777,10 @@ function main_stim()
     savefig("plot2.png")
 end
 
-#main_byrne()
+main_byrne()
 #plot_data_model_features("data/P7/06_02_2024_P7_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1")
 
-main_raf()
+#main_raf()
 #plot_data_model_features("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1")
+
+#plot_md_spec()
