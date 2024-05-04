@@ -2,6 +2,10 @@ module BenoitModel
 
     using DiffEqNoiseProcess, JSON, Plots, StatsBase
 
+    include("./Oscilltrack.jl")
+
+    using .Oscilltrack: Oscilltracker, update!, get_phase, decide_stim
+
     export BenoitModel, create_benoit_model, create_benoit_node, create_benoit_network, simulate_benoit_model
 
     struct Node
@@ -20,6 +24,7 @@ module BenoitModel
         W::Matrix{Float32}
         etta::Float32
         noise_dev::Float32
+        stim_mag::Float32
     end
 
     struct NodeActivity
@@ -27,27 +32,28 @@ module BenoitModel
         rI::Array{Float32, 1}
     end
 
-    function create_benoit_model(N::Int64, W::Matrix{Float32}, etta::Float32, tau_E::Float32, tau_I::Float32, w_EE::Float32, w_EI::Float32, w_IE::Float32, beta::Float32, noise_dev::Float32)
+    function create_benoit_model(N::Int64, W::Matrix{Float32}, etta::Float32, tau_E::Float32, tau_I::Float32, w_EE::Float32, w_EI::Float32, w_IE::Float32, beta::Float32, noise_dev::Float32, stim_mag::Float32)
         nodes = [Node(tau_E, tau_I, w_EE, w_EI, w_IE, beta, WienerProcess(0.0,noise_dev, 1.0), WienerProcess(0.0,noise_dev, 1.0)) for _ in 1:N]
-        return Network(nodes, W, etta, noise_dev)
+        return Network(nodes, W, etta, noise_dev, stim_mag)
     end
 
     function create_benoit_node(tau_E::Float32, tau_I::Float32, w_EE::Float32, w_EI::Float32, w_IE::Float32, beta::Float32, noise_dev::Float32)
         return Node(tau_E, tau_I, w_EE, w_EI, w_IE, beta, WienerProcess(0.0,noise_dev, 1.0), WienerProcess(0.0,noise_dev, 1.0))
     end
 
-    function create_benoit_network(nodes, W::Matrix{Float32}, etta::Float32, noise_dev::Float32)
-        return Network([nodes[i] for i in 1:length(nodes)], W, etta, noise_dev)
+    function create_benoit_network(nodes, W::Matrix{Float32}, etta::Float32, noise_dev::Float32, stim_mag::Float32)
+        return Network([nodes[i] for i in 1:length(nodes)], W, etta, noise_dev, stim_mag)
     end
 
     function sigmoid(x, beta)
         return 1.0 / (1.0 + exp(-beta * (x - 1)))
     end
 
-    function simulate_benoit_model(N::Network, range_t, dt, theta_E, theta_I)
+    function simulate_benoit_model(N::Network, range_t, dt, theta_E, theta_I, oscilltracker, stimBlock)
         # Initial conditions
         Lt = length(range_t)
         R = [NodeActivity(zeros(Lt), zeros(Lt)) for _ in N.nodes]
+        stim_delivered = zeros(Lt)
 
         rWE = [zeros(Lt) for _ in N.nodes]
         rWI = [zeros(Lt) for _ in N.nodes]
@@ -63,6 +69,8 @@ module BenoitModel
             calculate_step!(n.WE, dt, uWE[j], pWE[j])
             calculate_step!(n.WI, dt, uWI[j], pWI[j])
         end
+
+        stimIndex = 0
 
         # Simulate the model
         for i in 2:Lt
@@ -80,6 +88,21 @@ module BenoitModel
                 accept_step!(n.WE, dt, uWE[j], pWE[j])
                 accept_step!(n.WI, dt, uWI[j], pWI[j])
 
+                if j == 1
+                    update!(oscilltracker, R[j].rE[i-1])
+                    if decide_stim(oscilltracker) && stimIndex == 0
+                        stimIndex = 1
+                    end
+                    if stimIndex > 0
+                        drE = drE + stimBlock[stimIndex] * N.stim_mag
+                        stim_delivered[i] = stimBlock[stimIndex] * N.stim_mag
+                        stimIndex +=1
+                    end
+                    if stimIndex > length(stimBlock)
+                        stimIndex = 0
+                    end
+                end
+
                 rWE[j][i] = n.WE[i]
                 rWI[j][i] = n.WI[i]
     
@@ -87,6 +110,6 @@ module BenoitModel
                 R[j].rI[i] = R[j].rI[i-1] + drI + N.noise_dev * (n.WI[i] - n.WI[i - 1])
             end
         end
-        return R
+        return R, stim_delivered
     end
 end

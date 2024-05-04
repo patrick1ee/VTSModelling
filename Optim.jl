@@ -1,24 +1,25 @@
 include("./BenoitModel.jl")
 include("./ByrneModel.jl")
+include("./Oscilltrack.jl")
 include("./Signal.jl")
+include("./Stimulation.jl")
 
 using BlackBoxOptim, CSV, DataFrames, Distributions, DSP, FFTW, KernelDensity, KissSmoothing, Optimization, OptimizationCMAEvolutionStrategy, Plots, Statistics
 
 using .BenoitModel: create_benoit_model, create_benoit_node, create_benoit_network, simulate_benoit_model
 using .ByrneModel: create_byrne_pop, create_byrne_pop_EI, create_byrne_network, create_if_pop, simulate_if_pop, simulate_byrne_EI_network
 using .Signal: get_beta_data, get_pow_spec, get_hilbert_amplitude_pdf, get_burst_durations, get_plv_freq
+using .Stimulation: create_stim_block
+
+using .Oscilltrack: Oscilltracker
 
 const SR = 1000  # recording sampling rate in Hz, do not change this
 
-function run_act_time(m, simulate, range_t, dt, theta_E, theta_I, stim_response)
+function run_act_time(m, simulate, range_t, dt, theta_E, theta_I, oscilltracker, stimblock)
     theta_E_t = [fill(i, length(range_t)) for i in theta_E]
     theta_I_t = [fill(i, length(range_t)) for i in theta_I]
 
-    for i in 1:length(stim_response)
-        theta_E_t[1][i] = theta_E_t[1][i] .+ stim_response[i]
-    end
-
-    R = simulate(m, range_t, dt, theta_E_t, theta_I_t)
+    R, _ = simulate(m, range_t, dt, theta_E_t, theta_I_t, oscilltracker, stimblock)
 
     lR = length(R)
     for i in 1:lR
@@ -147,8 +148,8 @@ function cost_bb_bc(params)
 end
 
 function cost_bb(params)
-    csv_path = "data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1"
-    SR = 1000
+    #csv_path = "data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1"
+    csv_path = "data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=180_STIM_EC_v1"
 
     psd_df = CSV.read(csv_path*"/psd.csv", DataFrame)
     xPSD = psd_df[!, 1]
@@ -171,31 +172,28 @@ function cost_bb(params)
     w_IE = Float32(params[4])
     beta = Float32(params[5])
     noise_dev = Float32(params[6])
-    theta_E_A_param = Float32(params[7])
-    theta_I_A_param = Float32(params[8])
-    theta_E_B_param = Float32(params[7])
-    theta_I_B_param = Float32(params[8])
+    stim_mag = Float32(params[7])
+    theta_E_A_param = Float32(params[8])
+    theta_I_A_param = Float32(params[9])
+    theta_E_B_param = Float32(params[8])
+    theta_I_B_param = Float32(params[9])
 
-    model = create_benoit_model(N, W, etta, tau_E, tau_I, w_EE, w_EI, w_IE, beta, noise_dev)
+    model = create_benoit_model(N, W, etta, tau_E, tau_I, w_EE, w_EI, w_IE, beta, noise_dev, stim_mag)
     
     T = 100.0
     dt = 0.001
     range_t = 0.0:dt:T
 
-    response = fill(0.0, length(range_t)) 
-
-    #for i in 1:6:T-6
-    #    #Start pulse
-    #    for j in 0:24
-    #        for k in 0:2:10
-    #            response[Int64(trunc(i*1000+j*200+k*(1000/130)))] = 0.001684
-    #        end
-    #    end
-    #end
+    SR = 1000.0
+    stimBlock = create_stim_block(100.0, 100, 100, 10)
+    gamma_param = 0.1 # or 0.05
+    OT_suppress = 0.3
+    target_phase = pi / 2.0
+    target_freq = 10.0
+    oscilltracker = Oscilltracker(target_freq, target_phase, SR, OT_suppress, gamma_param)
 
     theta_E = [theta_E_A_param, theta_E_B_param]
     theta_I = [theta_I_A_param, theta_I_B_param]
-    stim = response
 
     init_slice = 100
     #num_trials = 1
@@ -216,7 +214,7 @@ function cost_bb(params)
         df_trials[1].R[2].rE[i] = sum[2] / num_trials
     end=#
 
-    df = run_act_time(model, simulate_benoit_model, range_t, dt, theta_E, theta_I, stim)
+    df = run_act_time(model, simulate_benoit_model, range_t, dt, theta_E, theta_I, oscilltracker, stimBlock)
     #zscore
     Eproc = df.R[1].rE[init_slice:end] .- mean(df.R[1].rE[init_slice:end]) / std(df.R[1].rE[init_slice:end])
     Eproc_alt = df.R[2].rE[init_slice:end] .- mean(df.R[2].rE[init_slice:end]) / std(df.R[2].rE[init_slice:end])
@@ -621,13 +619,13 @@ end
 function Optim()
     #
     #df_csv_r = CSV.read("data/params-wc-mir-1.3-0.9-0.9-0.9.csv", DataFrame)
-    good_guess = [0.016686, 1.30585, 4.18644, 7.88385, 5.09226, 0.04, 0.496913, -0.904573]
+    good_guess = [0.016686, 1.30585, 4.18644, 7.88385, 5.09226, 0.04, 0.005, 0.496913, -0.904573]
     #for i in 1:nrow(df_csv_r)
     #    push!(good_guess, [v for v in values(df_csv_r[i,:])])
     #end
     #  0 theta_I
     #good_guess = [0.016523340716958046,5.432121276855469,3.8098607063293457,6.350203514099121,6.220411777496338,0.5953848361968994]
-    p_range=[(0.016, 0.017), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (0.0, 0.3), (-2.0, 10.0), (-10.0, 2.0)]
+    p_range=[(0.016, 0.017), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (0.0, 10.0), (0.0, 0.3), (0.0, 0.02), (-2.0, 10.0), (-10.0, 2.0)]
 
     #Fixed W,beta
     #good_guess = [0.016686, 0.496913, -0.904573]

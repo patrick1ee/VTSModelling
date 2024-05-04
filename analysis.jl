@@ -8,7 +8,7 @@ module analysis
 
     const SR = 1000  # recording sampling rate in Hz, do not change this
 
-    export run_spec, run_hilbert_pdf, run_beta_burst, run_plv
+    export run_spec, run_hilbert_pdf, run_beta_burst, run_plv, get_raw
 
     function interpolate_nan(arr)
         Larr = length(arr)
@@ -476,6 +476,28 @@ module analysis
 
         print("LEN "*string(length(data_raw))*"\n")
     end
+
+    function get_raw(P, name, lb, ub)
+        data_path = "Patrick_data"
+
+        fid = h5open(data_path*"/"*P*"/"*name*".hdf5", "r")
+        data = read(fid["EEG"])
+        close(fid)
+
+        CONST_REF_CHAN = "CP1_local"
+        CONST_ALT_CHAN = "CP2_local"
+
+        data_outlierRem = parse_eeg_data(data, CONST_REF_CHAN)
+
+        data_raw = data_outlierRem
+        #zscore
+        data_raw = (data_raw .- mean(data_raw)) ./ std(data_raw)
+        data_raw = data_raw[lb:ub]
+
+        csv_df = DataFrame(x=1:length(data_raw),y=data_raw)
+        CSV.write("./raw.csv", csv_df)
+    end
 end
 
 #analysis.analyse_all_flat()
+#analysis.get_raw("P20", "15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1", 2001, 3000)

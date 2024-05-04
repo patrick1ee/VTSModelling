@@ -6,12 +6,14 @@ include("./RafalModel.jl")
 include("./Stimulation.jl")
 include("./Signal.jl")
 include("./Optim.jl")
+include("./Oscilltrack.jl")
 
 using ControlSystems, CSV, CurveFit, DataFrames, DSP, FFTW, KernelDensity, LsqFit, Measures, NeuralDynamics, Plots, Statistics, StatsBase
 using .RafalModel: create_rafal_model, simulate_rafal_model
 using .BenoitModel: create_benoit_model, simulate_benoit_model
 using .ByrneModel: create_byrne_pop, create_byrne_pop_EI, create_byrne_node, create_byrne_network, create_if_pop, simulate_if_pop, simulate_byrne_EI_network
-using .Stimulation: create_stimulus, create_stim_response, yousif_transfer
+using .Oscilltrack: Oscilltracker
+using .Stimulation: create_stimulus, create_stim_response, yousif_transfer, create_stim_block
 
 using .Signal: get_pow_spec, get_hilbert_amplitude_pdf, get_beta_data
 
@@ -312,17 +314,14 @@ function run_max_min_wc_net(model, simulate, range_t, dt, range_theta_input, the
    return DataFrame(theta=range_theta_input, rE_max=rE_max, rE_min=rE_min, input_pop=input_pop)
 end
 
-function run_act_time(m, simulate, range_t, dt, theta_E, theta_I, stim_response)
+function run_act_time(m, simulate, range_t, dt, theta_E, theta_I, oscilltracker, stimblock)
     theta_E_t = [fill(i, length(range_t)) for i in theta_E]
     theta_I_t = [fill(i, length(range_t)) for i in theta_I]
 
-    for i in 1:length(stim_response)
-        theta_E_t[1][i] = theta_E_t[1][i] .+ stim_response[i]
-    end
-
-    R = simulate(m, range_t, dt, theta_E_t, theta_I_t)
+    R, sd = simulate(m, range_t, dt, theta_E_t, theta_I_t, oscilltracker, stimblock)
     T = [range_t for i in 1:length(theta_E)]
-    return DataFrame(T=T, R=R, theta_E=theta_E_t, theta_I=theta_I_t)
+    SD = [sd for i in 1:length(theta_E)]
+    return DataFrame(T=T, R=R, sd=SD, theta_E=theta_E_t, theta_I=theta_I_t)
 end
 
 function run_act_oscill_time(m, simulate, range_t, dt, E_A, E_f, E_base, E_phase, I_A, I_f, I_base, I_phase)
@@ -413,11 +412,14 @@ function main_raf()
     #P7
     #p = [0.016783476, 7.9688745, 0.50424606, 8.942622, 5.3960485, 0.473071, -8.26678]
 
-    #P20 noise
-    #p = [0.0167907, 1.84502, 8.10264, 4.90234, 3.76054, 0.0673752, 0.275149, -2.27837]
+    #P20 noise - data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1
+    p = [0.0167907, 1.84502, 8.10264, 4.90234, 3.76054, 0.0673752, 0.005, 0.275149, -2.27837]
+
+    #P20 - 15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=180_STIM_EC_v1
+    [0.016717, 1.53592, 8.4121, 3.81443, 2.88771, 0.204127, 0.00539509, 0.28448, -4.23767]
 
     #Alpha oscillations
-    p = [0.016, 2.4, 2.0, 2.0, 4.0, 0.75, 0.5, 0.0]
+    #p = [0.016, 2.4, 2.0, 2.0, 4.0, 0.75, 0.5, 0.0]
 
     W=[Float32(0.0) Float32(1.0); Float32(1.0) Float32(0.0)]
     etta=Float32(0.5)
@@ -428,17 +430,28 @@ function main_raf()
     w_IE = Float32(p[4])
     beta = Float32(p[5])
     noise_dev = Float32(p[6])
-    thE_A = Float32(p[7])
-    thI_A = Float32(p[8])
-    thE_B = Float32(p[7])
-    thI_B = Float32(p[8])
+    stim_mag = Float32(p[7])
+    thE_A = Float32(p[8])
+    thI_A = Float32(p[9])
+    thE_B = Float32(p[8])
+    thI_B = Float32(p[9])
 
-    model = create_benoit_model(N, W, etta, tau_E, tau_I, w_EE, w_EI, w_IE, beta, noise_dev)
+    model = create_benoit_model(N, W, etta, tau_E, tau_I, w_EE, w_EI, w_IE, beta, noise_dev, stim_mag)
     
     T = 100.0
     dt = 0.001
     range_t = 0.0:dt:T
     sampling_rate = 1.0 / dt
+
+    stimBlock = create_stim_block(100.0, 100, 100, 10)
+    #plot(stimBlock)
+    #savefig("./myplot.png")
+    SR = 1000.0
+    gamma_param = 0.1 # or 0.05
+    OT_suppress = 0.3
+    target_phase = pi / 2.0
+    target_freq = 10.0
+    oscilltracker = Oscilltracker(target_freq, target_phase, SR, OT_suppress, gamma_param)
 
     #df = run_max_min_wc_net(model, simulate_benoit_model, range_t, dt, 0.0:0.01:2.0, 0.0, "E")
     #plot_max_min(df)
@@ -475,7 +488,7 @@ function main_raf()
     theta_E = [thE_A, thE_B]
     theta_I = [thI_A, thI_B]
     #stim = response
-    df = run_act_time(model, simulate_benoit_model, range_t, dt, theta_E, theta_I, stim)
+    df = run_act_time(model, simulate_benoit_model, range_t, dt, theta_E, theta_I, oscilltracker, stimBlock)
 
     #filter = digitalfilter(Bandpass(3.0,7.0),Butterworth(2))
     #df.R[1].rE = filtfilt(filter, df.R[1].rE)
@@ -493,23 +506,23 @@ function main_raf()
     #plot(1:length(raw_model_signal), raw_model_signal, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=5, xtickfont=22, ytickfont=22, legend=false, titlefont=22, guidefont=22, tickfont=22, legendfont=22)
     #savefig("plots/optim/model/raw.png")
 
-    #model_flt_beta = get_beta_data(cut_model_signal)
-    #model_flt_beta = (model_flt_beta .- mean(model_flt_beta)) ./ std(model_flt_beta)  
+    model_flt_beta = get_beta_data(cut_model_signal)
+    model_flt_beta = (model_flt_beta .- mean(model_flt_beta)) ./ std(model_flt_beta)  
 
     plot_path = "plots/optim/model"
     csv_path = "data/model"
  
     run_spec(raw_model_signal, plot_path, csv_path)
-    #run_hilbert_pdf(raw_model_signal, true)
+    run_hilbert_pdf(raw_model_signal, true)
  
-    #run_beta_burst(model_flt_beta, plot_path, csv_path)
-    #run_plv(raw_model_signal, raw_model_alt_signal, plot_path, csv_path)
+    run_beta_burst(model_flt_beta, plot_path, csv_path)
+    run_plv(raw_model_signal, raw_model_alt_signal, plot_path, csv_path)
  
-    #plot(1:length(model_flt_beta), model_flt_beta, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=5, xtickfont=22, ytickfont=22, legend=false, titlefont=22, guidefont=22, tickfont=22, legendfont=22)
-    #savefig("plots/optim/model/flt_beta.png")
+    plot(df.sd[1])
+    savefig("plots/optim/model/stim_delivered.png")
 
     # E-I plots
-    raw_model_signal_I = (df.R[1].rI .- mean(df.R[1].rI)) ./ std(df.R[1].rI)
+    #=raw_model_signal_I = (df.R[1].rI .- mean(df.R[1].rI)) ./ std(df.R[1].rI)
     raw_model_alt_signal_I = (df.R[2].rI .- mean(df.R[2].rI)) ./ std(df.R[2].rI)
     p1 = plot(
         range_t[1:1000],
@@ -594,7 +607,7 @@ function main_raf()
         color=1,
         )
     plot(p1, p2, layout=(2,1))
-    savefig("plots/diss/wc-oscill-alpha-noise.png")
+    savefig("plots/diss/wc-oscill-alpha-noise.png")=#
 end
 
 function main_byrne()
@@ -777,10 +790,11 @@ function main_stim()
     savefig("plot2.png")
 end
 
-main_byrne()
+#main_byrne()
 #plot_data_model_features("data/P7/06_02_2024_P7_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1")
 
-#main_raf()
+main_raf()
 #plot_data_model_features("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1")
+plot_data_model_features("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=180_STIM_EC_v1")
 
 #plot_md_spec()

@@ -33,3 +33,9 @@ P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1"
 P20-rest, narrow time-constant, new noise param
 Best candidate found: [0.0167907, 1.84502, 8.10264, 4.90234, 3.76054, 0.0673752, 0.275149, -2.27837]
 Fitness: 0.623524586
+
+E7
+P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=180_STIM_EC_v1
+P20-STIM
+Best candidate found: [0.016717, 1.53592, 8.4121, 3.81443, 2.88771, 0.204127, 0.00539509, 0.28448, -4.23767]
+Fitness: 0.814421564
