@@ -45,13 +45,13 @@ module Stimulation
         return response
     end
 
-    function create_stim_block(freq, ontime, offtime, range_t, padding) #ms
+    function create_stim_block(freq, ontime, offtime, range_t, delay) #ms
         Lt = length(range_t)
         stim = zeros(Lt)
         T = 1000.0 / freq
         rs = 0
-        for i in padding:Lt
-            if (i - padding) % (ontime + offtime) < ontime
+        for i in delay:Lt
+            if (i - delay) % (ontime + offtime) < ontime
                 if rs == 0
                     rs = i
                 end

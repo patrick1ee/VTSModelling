@@ -148,10 +148,12 @@ function cost_bb_bc(params)
 end
 
 function cost_bb(params)
-    P= "P4"
-    name = "05_02_2024_P4_Ch14_FRQ=11Hz_FULL_CL_phase=0_REST_EC_v1"
+    P= ARGS[1]
+    name = ARGS[2]
     
     csv_path = "data/"*P*"/"*name
+
+    print(csv_path)
 
     psd_df = CSV.read(csv_path*"/psd.csv", DataFrame)
     xPSD = psd_df[!, 1]
@@ -236,45 +238,23 @@ function cost_bb(params)
     elseif length(yPSDmod) < length(yPSDdat)
         yPSDdat = yPSDdat[1:length(yPSDmod)]
     end
-
-
-    peakDatPSD = argmax(yPSDdat)
-    peakModPSD = argmax(yPSDmod)
-    peakDatPLV = argmax(yPLVdat)
-    peakModPLV = argmax(yPLVmod)
     
-    coeffs = [1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0]
+    coeffs = [1.0, 1.0, 1.0, 1.0]
     cost1 = 2.0
     cost2 = 2.0
     cost3 = 2.0
     cost4 = 2.0
-    cost5 = 2.0
-    cost6 = 2.0
-    cost7 = 2.0
-    cost8 = 2.0
 
     cost1 = (sum((yPSDdat .- yPSDmod).^2) / sum((yPSDdat .- mean(yPSDdat)).^2))
     if length(yBAPDFmod) > 0
         cost2 = (sum((yBAPDFdat .- yBAPDFmod).^2) / sum((yBAPDFdat .- mean(yBAPDFdat)).^2))
-
-        peakDatAPDF = argmax(yBAPDFdat)
-        peakModAPDF = argmax(yBAPDFmod)
-        cost6 = abs(xBAPDFmod[peakModAPDF] - xBAPDFmod[peakDatAPDF])^2 / (xBAPDFmod[end] - xBAPDFmod[1])^2
     end
     if length(yBDPDFmod) > 0
         cost3 = (sum((yBDPDFdat .- yBDPDFmod).^2) / sum((yBDPDFdat .- mean(yBDPDFdat)).^2))
-
-        peakDatDPDF = argmax(yBDPDFdat)
-        peakModDPDF = argmax(yBDPDFmod)
-        cost7 = abs(aBDPDF[peakModDPDF] - aBDPDF[peakDatDPDF])^2 / (aBDPDF[end] - aBDPDF[1])^2
     end
     cost4 = (sum((yPLVdat .- yPLVmod).^2) / sum((yPLVdat .- mean(yPLVdat)).^2))
 
-
-    cost5 = abs(xPSD[peakDatPSD] - freq[peakModPSD])^2 / (xPSD[end] - xPSD[1])^2
-    cost8 = abs(xPLVmod[peakModPLV] - xPLVmod[peakDatPLV])^2 / (xPLVmod[end] - xPLVmod[1])^2
-
-    cost = coeffs[1]*cost1 + coeffs[2]*cost2 + coeffs[3]*cost3 + coeffs[4]*cost4 + coeffs[5]*cost5 + coeffs[6]*cost6 + coeffs[7]*cost7 + coeffs[8]*cost8
+    cost = coeffs[1]*cost1 + coeffs[2]*cost2 + coeffs[3]*cost3 + coeffs[4]*cost4
     cost = cost / 4
 
     filename="./jobs-out/costs-"*name*".txt"
@@ -688,8 +668,8 @@ function O(P, name, mode)
     elseif mode == "bp"
         opt_param(P, name, 1)
     elseif mode == "opt"
-        good_guess = [0.01658759079873562,1.9765267372131348,7.805781841278076,8.708059310913086,8.914440155029297,0.16979466378688812,7.87988805770874,-5.185361862182617]
-        res = bboptimize(cost_bb, good_guess; SearchRange=p_bounds, MaxSteps=2500)
+        good_guess = [0.0167907, 1.84502, 8.10264, 4.90234, 3.76054, 0.0673752, 0.275149, -2.27837]
+        res = bboptimize(cost_bb, good_guess; SearchRange=p_bounds, MaxSteps=5)
         filename="./jobs-out/"*P*"-"*name*".txt"
 
         fileID = open(filename, "w")
@@ -703,4 +683,4 @@ end
  end
 
  #O("P4", "05_02_2024_P4_Ch14_FRQ=11Hz_FULL_CL_phase=0_REST_EC_v1", "opt")
- #main(ARGS)
+ main(ARGS)

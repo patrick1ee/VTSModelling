@@ -427,9 +427,12 @@ function main_raf()
     #p = [0.04485432058572769,2.053753137588501,8.179677963256836,9.587191581726074,4.211299419403076,0.15265828371047974,0.0, 8.231314659118652,-0.49894988536834717]
     #p = [0.0128556, 0.382607, 2.21226, 6.21208, 9.48622, 0.271685, 0.0, 6.98884, 0.745291]
     #p = [0.0166703, 0.634375, 9.93469, 7.61141, 5.06469, 0.127048, 0.0, 0.794265, -6.08712]
-    p = [0.0103056, 0.238631, 7.27788, 4.41397, 8.84963, 0.154915, 0.0, 4.92246, 0.102291]
+   # p = [0.0103056, 0.238631, 7.27788, 4.41397, 8.84963, 0.154915, 0.0, 4.92246, 0.102291]
+   # p = [0.0167882, 0.47009, 9.81269, 8.75759, 4.55063, 0.113229, 0.0, 0.749659, -5.39723]
     #Alpha oscillations
     #p = [0.016, 2.4, 2.0, 2.0, 4.0, 0.75, 0.5, 0.0]
+
+    p = [0.0167907, 1.84502, 8.10264, 4.90234, 3.76054, 0.0673752, 0.0, 0.275149, -2.27837]
 
     W=[Float32(0.0) Float32(1.0); Float32(1.0) Float32(0.0)]
     etta=Float32(0.5)
@@ -786,9 +789,9 @@ end
 #plot_data_model_features("data/P7/06_02_2024_P7_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1")
 
 main_raf()
-#plot_data_model_features("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1")
+plot_data_model_features("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1")
 #lot_data_model_features("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=180_STIM_EC_v1")
 #plot_data_model_features("data/P9/07_02_2024_P9_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v2")
-plot_data_model_features("data/P4/05_02_2024_P4_Ch14_FRQ=11Hz_FULL_CL_phase=0_REST_EC_v1")
+#plot_data_model_features("data/P4/05_02_2024_P4_Ch14_FRQ=11Hz_FULL_CL_phase=0_REST_EC_v1")
 
 #plot_md_spec()
