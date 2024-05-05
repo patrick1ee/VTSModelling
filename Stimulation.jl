@@ -1,6 +1,6 @@
 module Stimulation
 
-    using PyCall, Plots
+    using PyCall, Plots, Statistics
 
     pushfirst!(PyVector(pyimport("sys")."path"), "./")
     @pyimport Receptors
@@ -41,7 +41,7 @@ module Stimulation
     end
 
     function create_stim_response(stim, range_t)
-        response = 3.5*Receptors.get_response(stim, range_t)
+        response = Receptors.get_response(stim, range_t) .- mean(Receptors.get_response(stim, range_t))
         return response
     end
 
@@ -61,7 +61,7 @@ module Stimulation
                 stim[i] = 0.0
             end
         end
-        return stim
+        return create_stim_response(stim, range_t)
     end
 
     function test_stim()
