@@ -13,7 +13,7 @@ using .Stimulation: create_stim_block
 
 using .Oscilltrack: Oscilltracker
 
-const SR = 1000  # recording sampling rate in Hz, do not change this
+const SR = 1000.0  # recording sampling rate in Hz, do not change this
 
 function run_act_time(m, simulate, range_t, dt, theta_E, theta_I, oscilltracker, stimblock)
     theta_E_t = [fill(i, length(range_t)) for i in theta_E]
@@ -148,8 +148,7 @@ function cost_bb_bc(params)
 end
 
 
-SR = 1000.0
-stimBlock = create_stim_block(100.0, 25, 25, 0.0:dt:100.0, 1)
+stimBlock = create_stim_block(100.0, 25, 25, 0.0:0.001:100.0, 1)
 gamma_param = 0.1 # or 0.05
 OT_suppress = 0.3
 target_phase = pi / 2.0
@@ -162,7 +161,7 @@ function cost_bb(params)
     
     csv_path = "data/"*P*"/"*name
 
-    print(csv_path)
+   # print(csv_path)
 
     psd_df = CSV.read(csv_path*"/psd.csv", DataFrame)
     xPSD = psd_df[!, 1]
@@ -685,4 +684,4 @@ end
  end
 
  #O("P4", "05_02_2024_P4_Ch14_FRQ=11Hz_FULL_CL_phase=0_REST_EC_v1", "opt")
- main(ARGS)
+ #main(ARGS)

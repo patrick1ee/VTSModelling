@@ -417,6 +417,7 @@ function main_raf()
 
     #P20 - 15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=180_STIM_EC_v1
     #p = [0.016717, 1.53592, 8.4121, 3.81443, 2.88771, 0.204127, 0.00539509, 0.28448, -4.23767]
+    p = [0.0162904, 0.434542, 6.39134, 6.7426, 5.9051, 0.264186, 0.27402, 0.933472, -5.18417]
 
     #P9 - 07_02_2024_P9_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v2
     #p = [0.01630263589322567, 1.1694562435150146, 4.138545036315918, 2.86141300201416, 3.389385938644409, 0.1073860228061676, 0.0, 3.007591962814331, 0.5085129141807556]
@@ -789,8 +790,8 @@ end
 #plot_data_model_features("data/P7/06_02_2024_P7_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1")
 
 main_raf()
-plot_data_model_features("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1")
-#plot_data_model_features("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=180_STIM_EC_v1")
+#plot_data_model_features("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1")
+plot_data_model_features("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=180_STIM_EC_v1")
 #plot_data_model_features("data/P9/07_02_2024_P9_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v2")
 #plot_data_model_features("data/P4/05_02_2024_P4_Ch14_FRQ=11Hz_FULL_CL_phase=0_REST_EC_v1")
 
