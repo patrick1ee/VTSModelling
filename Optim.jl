@@ -243,7 +243,7 @@ function cost_bb(params)
     peakDatPLV = argmax(yPLVdat)
     peakModPLV = argmax(yPLVmod)
     
-    coeffs = [1.0, 1.0, 1.0, 1.0, 0.5, 0.5, 0.5, 0.5]
+    coeffs = [1.0, 1.0, 1.0, 1.0, 0.0, 0.0, 0.0, 0.0]
     cost1 = 2.0
     cost2 = 2.0
     cost3 = 2.0
@@ -275,7 +275,7 @@ function cost_bb(params)
     cost8 = abs(xPLVmod[peakModPLV] - xPLVmod[peakDatPLV])^2 / (xPLVmod[end] - xPLVmod[1])^2
 
     cost = coeffs[1]*cost1 + coeffs[2]*cost2 + coeffs[3]*cost3 + coeffs[4]*cost4 + coeffs[5]*cost5 + coeffs[6]*cost6 + coeffs[7]*cost7 + coeffs[8]*cost8
-    cost = cost / 8
+    cost = cost / 4
 
     filename="./jobs-out/costs-"*name*".txt"
 
@@ -702,5 +702,5 @@ end
     O(args[1], args[2], "opt")
  end
 
- O("P4", "05_02_2024_P4_Ch14_FRQ=11Hz_FULL_CL_phase=0_REST_EC_v1", "opt")
+ #O("P4", "05_02_2024_P4_Ch14_FRQ=11Hz_FULL_CL_phase=0_REST_EC_v1", "opt")
  #main(ARGS)
