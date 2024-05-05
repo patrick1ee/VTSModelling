@@ -213,15 +213,16 @@ function plot_data_model_features(csv_data_path)
     plot(
         [df_psd_data[!, 1], df_psd_model[!, 1]],
         [df_psd_data[!, 2], df_psd_model[!, 2]],
-        xlabel="frequency (Hz)",
+        xlabel="Frequency (Hz)",
+        title="Power Spectral Density",
         size=(500,500),
-        linewidth=5,
-        xtickfont=22,
-        ytickfont=22,
+        linewidth=3,
+        xtickfont=12,
+        ytickfont=12,
         label=["data" "model"],
-        titlefont=22,
-        guidefont=22,
-        tickfont=22,
+        titlefont=12,
+        guidefont=12,
+        tickfont=12,
     )
     savefig("plots/optim/comb/psd.png")
 
@@ -229,45 +230,132 @@ function plot_data_model_features(csv_data_path)
     plot(
         df_beta_amp_pdf_data[!, 1],
         [df_beta_amp_pdf_data[!, 2], df_beta_amp_pdf_model[!, 2]],
-        xlabel="amplitude",
+        xlabel="Amplitude",
+        title="Beta Burst Amplitude PDFs",
         size=(500,500),
-        linewidth=5, 
-        xtickfont=22,
-        ytickfont=22,
+        linewidth=3, 
+        xtickfont=12,
+        ytickfont=12,
         label=["data" "model"],
-        titlefont=22, 
-        guidefont=22,
-        tickfont=22,
+        titlefont=12, 
+        guidefont=12,
+        tickfont=12,
     )
     savefig("plots/optim/comb/beta-amp-pdf.png")
 
     plot(
-        df_beta_dur_pdf_data[!, 1],
+        df_beta_dur_pdf_data[!, 1] .* 1000.0,
         [df_beta_dur_pdf_data[!, 2], df_beta_dur_pdf_model[!, 2]],
-        xlabel="duration (s)",
+        xlabel="Dduration (ms)",
+        title="Beta Burst Amplitude PDFs",
         size=(500,500),
-        linewidth=5, 
-        xtickfont=22,
-        ytickfont=22,
+        linewidth=3, 
+        xtickfont=12,
+        ytickfont=12,
         label=["data" "model"],
-        titlefont=22, 
-        guidefont=22,
-        tickfont=22,
+        titlefont=12, 
+        guidefont=12,
+        tickfont=12,
     )
     savefig("plots/optim/comb/beta-dur-pdf.png")
 
     plot(
         df_plvs_data[!, 1],
         [df_plvs_data[!, 2], df_plvs_model[!, 2]],
-        xlabel="frequency (Hz)",
+        xlabel="Frequency (Hz)",
+        title="Inter-hemisphere Phase-locking Value",
         size=(500,500),
-        linewidth=5,
-        xtickfont=22,
-        ytickfont=22,
+        linewidth=3,
+        xtickfont=12,
+        ytickfont=12,
         label=["data" "model"],
-        titlefont=22,
-        guidefont=22,
-        tickfont=22
+        titlefont=12,
+        guidefont=12,
+        tickfont=12
+    )
+    savefig("plots/optim/comb/plv.png")
+end
+
+function plot_data_model_features_stim(csv_data_path)
+    # Load data
+    df_psd_data = CSV.read(csv_data_path*"/psd.csv", DataFrame)   
+    df_psd_model = CSV.read("data/model/psd.csv", DataFrame)
+    df_psd_model_s = CSV.read("data/model-stim/psd.csv", DataFrame)
+
+    df_beta_amp_pdf_data = CSV.read(csv_data_path*"/bapdf.csv", DataFrame)
+    df_beta_amp_pdf_model = CSV.read("data/model/bapdf.csv", DataFrame)
+    df_beta_amp_pdf_model_s = CSV.read("data/model-stim/bapdf.csv", DataFrame)
+
+    df_beta_dur_pdf_data = CSV.read(csv_data_path*"/bdpdf.csv", DataFrame)
+    df_beta_dur_pdf_model = CSV.read("data/model/bdpdf.csv", DataFrame)
+    df_beta_dur_pdf_model_s = CSV.read("data/model-stim/bdpdf.csv", DataFrame)
+
+    df_plvs_data = CSV.read(csv_data_path*"/plvs.csv", DataFrame)
+    df_plvs_model = CSV.read("data/model/plvs.csv", DataFrame)
+    df_plvs_model_s = CSV.read("data/model-stim/plvs.csv", DataFrame)
+
+    plot(
+        [df_psd_data[!, 1], df_psd_model[!, 1], df_psd_model_s[!, 1]],
+        [df_psd_data[!, 2], df_psd_model[!, 2], df_psd_model_s[!, 2]],
+        xlabel="Frequency (Hz)",
+        title="Power Spectral Density",
+        size=(500,500),
+        linewidth=3,
+        xtickfont=12,
+        ytickfont=12,
+        label=["data" "model" "model-stim"],
+        titlefont=12,
+        guidefont=12,
+        tickfont=12,
+    )
+    savefig("plots/optim/comb/psd.png")
+
+
+    plot(
+        df_beta_amp_pdf_data[!, 1],
+        [df_beta_amp_pdf_data[!, 2], df_beta_amp_pdf_model[!, 2], df_beta_amp_pdf_model_s[!, 2]],
+        xlabel="Amplitude",
+        title="Beta Burst Amplitude PDFs",
+        size=(500,500),
+        linewidth=3, 
+        xtickfont=12,
+        ytickfont=12,
+        label=["data" "model" "model-stim"],
+        titlefont=12, 
+        guidefont=12,
+        tickfont=12,
+    )
+    savefig("plots/optim/comb/beta-amp-pdf.png")
+
+    plot(
+        df_beta_dur_pdf_data[!, 1] .* 1000.0,
+        [df_beta_dur_pdf_data[!, 2], df_beta_dur_pdf_model[!, 2], df_beta_dur_pdf_model_s[!, 2]],
+        xlabel="Dduration (ms)",
+        title="Beta Burst Amplitude PDFs",
+        size=(500,500),
+        linewidth=3, 
+        xtickfont=12,
+        ytickfont=12,
+        label=["data" "model" "model-stim"],
+        titlefont=12, 
+        guidefont=12,
+        tickfont=12,
+    )
+    savefig("plots/optim/comb/beta-dur-pdf.png")
+
+    plot(
+        df_plvs_data[!, 1],
+        [df_plvs_data[!, 2], df_plvs_model[!, 2], df_plvs_model_s[!, 2]],
+        xlabel="Frequency (Hz)",
+        title="Inter-hemisphere Phase-locking Value",
+        size=(500,500),
+        linewidth=3,
+        xtickfont=12,
+        ytickfont=12,
+        label=["data" "model" "model-stim"],
+        titlefont=12,
+        guidefont=12,
+        tickfont=12
     )
     savefig("plots/optim/comb/plv.png")
 end
@@ -373,7 +461,7 @@ function plot_hilbert_amplitude_pdf(signal::Array{Float32, 1},T, sampling_rate, 
 
 end
 
-function main_raf()
+function main_raf(p; csv_path = "data/model")
     # Parameters (time in s)
     N=2
     #[0.0147128, 19.451, 19.0874, 24.8283, 10.9761, -26.5766, 15.5643]
@@ -403,7 +491,7 @@ function main_raf()
 
     #P20
     #p = [0.016686, 1.30585, 4.18644, 7.88385, 5.09226, 0.04, 0.496913, -0.904573]
-    good_guess = [0.01684509590268135, 2.808759927749634, 2.9388251304626465, 5.182344913482666, 8.326308250427246, 0.595751166343689, 0.3267395496368408]
+    #good_guess = [0.01684509590268135, 2.808759927749634, 2.9388251304626465, 5.182344913482666, 8.326308250427246, 0.595751166343689, 0.3267395496368408]
     #p = good_guess
 
     #P20 fixedWB
@@ -413,11 +501,12 @@ function main_raf()
     #p = [0.016783476, 7.9688745, 0.50424606, 8.942622, 5.3960485, 0.473071, -8.26678]
 
     #P20 noise - data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1
-    #p = [0.0167907, 1.84502, 8.10264, 4.90234, 3.76054, 0.0673752, 0.005, 0.275149, -2.27837]
+    #p = [0.0167907, 1.84502, 8.10264, 4.90234, 3.76054, 0.0673752, 0.27402, 0.275149, -2.27837]
+    #p = [0.0163928, 1.30585, 4.18644, 7.88385, 5.09226, 0.0204127, 0.0, 0.53322, -0.693958]
 
     #P20 - 15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=180_STIM_EC_v1
     #p = [0.016717, 1.53592, 8.4121, 3.81443, 2.88771, 0.204127, 0.00539509, 0.28448, -4.23767]
-    p = [0.0162904, 0.434542, 6.39134, 6.7426, 5.9051, 0.264186, 0.27402, 0.933472, -5.18417]
+    #p = [0.0162904, 0.434542, 6.39134, 6.7426, 5.9051, 0.264186, 0.27402, 0.933472, -5.18417]
 
     #P9 - 07_02_2024_P9_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v2
     #p = [0.01630263589322567, 1.1694562435150146, 4.138545036315918, 2.86141300201416, 3.389385938644409, 0.1073860228061676, 0.0, 3.007591962814331, 0.5085129141807556]
@@ -433,7 +522,7 @@ function main_raf()
     #Alpha oscillations
     #p = [0.016, 2.4, 2.0, 2.0, 4.0, 0.75, 0.5, 0.0]
 
-    p = [0.0167907, 1.84502, 8.10264, 4.90234, 3.76054, 0.0673752, 0.0, 0.275149, -2.27837]
+    #p = [0.0167907, 1.84502, 8.10264, 4.90234, 3.76054, 0.0673752, 0.0, 0.275149, -2.27837]
 
     W=[Float32(0.0) Float32(1.0); Float32(1.0) Float32(0.0)]
     etta=Float32(0.5)
@@ -506,7 +595,6 @@ function main_raf()
     model_flt_beta = (model_flt_beta .- mean(model_flt_beta)) ./ std(model_flt_beta)  
 
     plot_path = "plots/optim/model"
-    csv_path = "data/model"
  
     run_spec(raw_model_signal, plot_path, csv_path)
     run_hilbert_pdf(raw_model_signal, true)
@@ -789,9 +877,12 @@ end
 #main_byrne()
 #plot_data_model_features("data/P7/06_02_2024_P7_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1")
 
-main_raf()
+p = [0.0167907, 1.84502, 8.10264, 4.90234, 3.76054, 0.0673752, 0.27402, 0.275149, -2.27837]
+ps = [0.0162904, 0.434542, 6.39134, 6.7426, 5.9051, 0.264186, 0.27402, 0.933472, -5.18417]
+main_raf(p)
+main_raf(ps, csv_path = "data/model-stim")
 #plot_data_model_features("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1")
-plot_data_model_features("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=180_STIM_EC_v1")
+plot_data_model_features_stim("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=180_STIM_EC_v1")
 #plot_data_model_features("data/P9/07_02_2024_P9_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v2")
 #plot_data_model_features("data/P4/05_02_2024_P4_Ch14_FRQ=11Hz_FULL_CL_phase=0_REST_EC_v1")
 

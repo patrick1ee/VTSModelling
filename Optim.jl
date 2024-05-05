@@ -647,6 +647,20 @@ function Optim()
     println(sol)
 end
 
+function plot_loss(name)
+    df_csv_r = CSV.read("jobs-out/costs-"*name*".csv", DataFrame)
+    y = [df_csv_r[!, 1][2]]
+    for d in 3:length(df_csv_r[!, 1])
+        if df_csv_r[!, 1][d] < y[end]
+            push!(y, df_csv_r[!, 1][d])
+        end
+    end
+
+ 
+    plot(y)
+    savefig("loss.png")
+end
+
 #Optim()
 
 #p_range = [(23.09, 23.11), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0), (0.0, 10.0), (-2.0, 10.0), (-10.0, 2.0)]
@@ -685,3 +699,4 @@ end
 
  #O("P4", "05_02_2024_P4_Ch14_FRQ=11Hz_FULL_CL_phase=0_REST_EC_v1", "opt")
  #main(ARGS)
+ #plot_loss(ARGS[1])

@@ -29,7 +29,7 @@ Best candidate found: [0.0163928, 1.30585, 4.18644, 7.88385, 5.09226, 0.53322, -
 Fitness: 0.600041384
 
 E6
-P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1"
+P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1
 P20-rest, narrow time-constant, new noise param
 Best candidate found: [0.0167907, 1.84502, 8.10264, 4.90234, 3.76054, 0.0673752, 0.275149, -2.27837]
 Fitness: 0.623524586
