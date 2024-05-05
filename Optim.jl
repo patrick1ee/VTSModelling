@@ -148,8 +148,8 @@ function cost_bb_bc(params)
 end
 
 function cost_bb(params)
-    P= "P9"
-    name = "07_02_2024_P9_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v2"
+    P= "P4"
+    name = "05_02_2024_P4_Ch14_FRQ=11Hz_FULL_CL_phase=0_REST_EC_v1"
     
     csv_path = "data/"*P*"/"*name
 
@@ -277,13 +277,18 @@ function cost_bb(params)
     cost = coeffs[1]*cost1 + coeffs[2]*cost2 + coeffs[3]*cost3 + coeffs[4]*cost4 + coeffs[5]*cost5 + coeffs[6]*cost6 + coeffs[7]*cost7 + coeffs[8]*cost8
     cost = cost / 8
 
-    filename="costs.txt"
+    filename="./jobs-out/costs-"*name*".txt"
 
     if isfile(filename)
         fileID = open(filename, "w")
         println(fileID, "::", tau_E, "::", tau_I, "::", w_EE, "::", w_EI, "::", w_IE, "::", beta, "::", cost1, "::", cost2, "::", cost3, "::", cost4, "\n")
         close(fileID)
     end
+
+    new_row= (cost=cost,)
+    df_csv_r = CSV.read("./jobs-out/costs-"*name*".csv", DataFrame)
+    push!(df_csv_r, new_row)
+    CSV.write("./jobs-out/costs-"*name*".csv", df_csv_r)
 
     return cost
 end
@@ -669,7 +674,7 @@ end
 
 function O(P, name, mode)
     p_bounds=[
-            (0.016, 0.017),
+            (0.0, 0.3),
             (0.0, 10.0),
             (0.0, 10.0),
             (0.0, 10.0),
@@ -683,7 +688,7 @@ function O(P, name, mode)
     elseif mode == "bp"
         opt_param(P, name, 1)
     elseif mode == "opt"
-        good_guess = [0.01658759079873562,1.9765267372131348,7.805781841278076,8.708059310913086,8.914440155029297,0.16979466378688812,7.87988805770874,-5.185361862182617]
+        good_guess = [0.04485432058572769,2.053753137588501,8.179677963256836,9.587191581726074,4.211299419403076,0.15265828371047974, 8.231314659118652,-0.49894988536834717]
         res = bboptimize(cost_bb, good_guess; SearchRange=p_bounds, MaxSteps=2500)
         filename="./jobs-out/"*P*"-"*name*".txt"
 
