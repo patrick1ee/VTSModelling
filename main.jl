@@ -13,7 +13,7 @@ using .RafalModel: create_rafal_model, simulate_rafal_model
 using .BenoitModel: create_benoit_model, simulate_benoit_model
 using .ByrneModel: create_byrne_pop, create_byrne_pop_EI, create_byrne_node, create_byrne_network, create_if_pop, simulate_if_pop, simulate_byrne_EI_network
 using .Oscilltrack: Oscilltracker
-using .Stimulation: create_stimulus, create_stim_response, yousif_transfer, create_stim_block
+using .Stimulation: create_stim_response, yousif_transfer, create_stim_block
 
 using .Signal: get_pow_spec, get_hilbert_amplitude_pdf, get_beta_data
 
@@ -416,8 +416,16 @@ function main_raf()
     p = [0.0167907, 1.84502, 8.10264, 4.90234, 3.76054, 0.0673752, 0.005, 0.275149, -2.27837]
 
     #P20 - 15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=180_STIM_EC_v1
-    [0.016717, 1.53592, 8.4121, 3.81443, 2.88771, 0.204127, 0.00539509, 0.28448, -4.23767]
+    p = [0.016717, 1.53592, 8.4121, 3.81443, 2.88771, 0.204127, 0.00539509, 0.28448, -4.23767]
 
+    #P9 - 07_02_2024_P9_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v2
+    p = [0.01630263589322567, 1.1694562435150146, 4.138545036315918, 2.86141300201416, 3.389385938644409, 0.1073860228061676, 0.0, 3.007591962814331, 0.5085129141807556]
+    p = [0.0166656, 0.118731, 8.28523, 4.19118, 8.46533, 0.172144, 0.0, 0.960148, -4.25145]
+
+    #P4 - 05_02_2024_P4_Ch14_FRQ=11Hz_FULL_CL_phase=0_REST_EC_v1
+    p = [0.01658759079873562,1.9765267372131348,7.805781841278076,8.708059310913086,8.914440155029297,0.16979466378688812,0.0, 7.87988805770874,-5.185361862182617]
+    #p = [0.04485432058572769,2.053753137588501,8.179677963256836,9.587191581726074,4.211299419403076,0.15265828371047974,0.0, 8.231314659118652,-0.49894988536834717]
+    #p = [0.0128556, 0.382607, 2.21226, 6.21208, 9.48622, 0.271685, 0.0, 6.98884, 0.745291]
     #Alpha oscillations
     #p = [0.016, 2.4, 2.0, 2.0, 4.0, 0.75, 0.5, 0.0]
 
@@ -443,7 +451,7 @@ function main_raf()
     range_t = 0.0:dt:T
     sampling_rate = 1.0 / dt
 
-    stimBlock = create_stim_block(100.0, 100, 100, 10)
+    stimBlock = create_stim_block(100.0, 100, 100, 10, 1)
     #plot(stimBlock)
     #savefig("./myplot.png")
     SR = 1000.0
@@ -467,27 +475,9 @@ function main_raf()
     #I_phase = -(pi / 3)
     #df = run_act_oscill_time(model, simulate_benoit_model, range_t, dt, E_A, E_f, E_base, E_phase, I_A, I_f, I_base, I_phase)
 
-    A=2*100*1e-3
-    f=4
-
-    stim=create_stimulus(A, f, range_t)
-    response=create_stim_response(stim, range_t)
-    #plot(range_t, response, xlabel="time (ms)", ylabel="V", size=(500,500), xlim=(0, 0.1), xticks=0:0.02:0.1, linewidth=5, xtickfont=22, ytickfont=22, legend=false, titlefont=22, guidefont=22, tickfont=22, legendfont=22)
-    #savefig("jul-test.png")
-
-    stim = zeros(length(range_t))
-    #response = fill(0.0, length(range_t)) #yousif_transfer(A, f, range_t)
-    #for i in 1:6:T-6
-    #    #Start pulse
-    #    for j in 0:24
-    #        for k in 0:2:10
-    #            response[Int64(trunc(i*1000+j*200+k*(1000/130)))] = 0.001684
-    #        end
-    #    end
-    #end
     theta_E = [thE_A, thE_B]
     theta_I = [thI_A, thI_B]
-    #stim = response
+
     df = run_act_time(model, simulate_benoit_model, range_t, dt, theta_E, theta_I, oscilltracker, stimBlock)
 
     #filter = digitalfilter(Bandpass(3.0,7.0),Butterworth(2))
@@ -795,6 +785,8 @@ end
 
 main_raf()
 #plot_data_model_features("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1")
-plot_data_model_features("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=180_STIM_EC_v1")
+#lot_data_model_features("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=180_STIM_EC_v1")
+#plot_data_model_features("data/P9/07_02_2024_P9_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v2")
+plot_data_model_features("data/P4/05_02_2024_P4_Ch14_FRQ=11Hz_FULL_CL_phase=0_REST_EC_v1")
 
 #plot_md_spec()

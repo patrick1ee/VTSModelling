@@ -88,7 +88,7 @@ module BenoitModel
                 accept_step!(n.WE, dt, uWE[j], pWE[j])
                 accept_step!(n.WI, dt, uWI[j], pWI[j])
 
-                if j == 1
+                if j == 1 && N.stim_mag > 0
                     update!(oscilltracker, R[j].rE[i-1])
                     if decide_stim(oscilltracker) && stimIndex == 0
                         stimIndex = 1

@@ -8,7 +8,7 @@ using BlackBoxOptim, CSV, DataFrames, Distributions, DSP, FFTW, KernelDensity, K
 
 using .BenoitModel: create_benoit_model, create_benoit_node, create_benoit_network, simulate_benoit_model
 using .ByrneModel: create_byrne_pop, create_byrne_pop_EI, create_byrne_network, create_if_pop, simulate_if_pop, simulate_byrne_EI_network
-using .Signal: get_beta_data, get_pow_spec, get_hilbert_amplitude_pdf, get_burst_durations, get_plv_freq
+using .Signal: get_beta_data, get_pow_spec, get_hilbert_amplitude_pdf, get_burst_profiles, get_plv_freq
 using .Stimulation: create_stim_block
 
 using .Oscilltrack: Oscilltracker
@@ -148,8 +148,10 @@ function cost_bb_bc(params)
 end
 
 function cost_bb(params)
-    #csv_path = "data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1"
-    csv_path = "data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=180_STIM_EC_v1"
+    P= "P9"
+    name = "07_02_2024_P9_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v2"
+    
+    csv_path = "data/"*P*"/"*name
 
     psd_df = CSV.read(csv_path*"/psd.csv", DataFrame)
     xPSD = psd_df[!, 1]
@@ -172,11 +174,11 @@ function cost_bb(params)
     w_IE = Float32(params[4])
     beta = Float32(params[5])
     noise_dev = Float32(params[6])
-    stim_mag = Float32(params[7])
-    theta_E_A_param = Float32(params[8])
-    theta_I_A_param = Float32(params[9])
-    theta_E_B_param = Float32(params[8])
-    theta_I_B_param = Float32(params[9])
+    stim_mag = Float32(0.0)
+    theta_E_A_param = Float32(params[7])
+    theta_I_A_param = Float32(params[8])
+    theta_E_B_param = Float32(params[7])
+    theta_I_B_param = Float32(params[8])
 
     model = create_benoit_model(N, W, etta, tau_E, tau_I, w_EE, w_EI, w_IE, beta, noise_dev, stim_mag)
     
@@ -185,7 +187,7 @@ function cost_bb(params)
     range_t = 0.0:dt:T
 
     SR = 1000.0
-    stimBlock = create_stim_block(100.0, 100, 100, 10)
+    stimBlock = create_stim_block(100.0, 100, 100, 10, 1)
     gamma_param = 0.1 # or 0.05
     OT_suppress = 0.3
     target_phase = pi / 2.0
@@ -222,34 +224,58 @@ function cost_bb(params)
     Ebeta = Ebeta .- mean(Ebeta) / std(Ebeta)
 
     freq, yPSDmod = get_pow_spec(Eproc, xPSD, SR)
-    _, yBAPDFmod, Ebeta_ha = get_hilbert_amplitude_pdf(Ebeta)
-    _, yBDPDFmod, _ = get_burst_durations(Ebeta_ha)
-    yPLVmod = get_plv_freq(Eproc, Eproc_alt)
+
+    _, _, ha = get_hilbert_amplitude_pdf(Ebeta)
+    S, N = denoise(convert(AbstractArray{Float64}, ha))
+    xBAPDFmod, yBAPDFmod, aBDPDF, yBDPDFmod, _, _ = get_burst_profiles(S)
+
+    xPLVmod, yPLVmod = get_plv_freq(Eproc, Eproc_alt)
 
     if length(yPSDmod) > length(yPSDdat)
         yPSDmod = yPSDmod[1:length(yPSDdat)]
     elseif length(yPSDmod) < length(yPSDdat)
         yPSDdat = yPSDdat[1:length(yPSDmod)]
     end
+
+
+    peakDatPSD = argmax(yPSDdat)
+    peakModPSD = argmax(yPSDmod)
+    peakDatPLV = argmax(yPLVdat)
+    peakModPLV = argmax(yPLVmod)
     
-    coeffs = [1.05, 0.95, 0.95, 1.05]
+    coeffs = [1.0, 1.0, 1.0, 1.0, 0.5, 0.5, 0.5, 0.5]
     cost1 = 2.0
     cost2 = 2.0
     cost3 = 2.0
     cost4 = 2.0
+    cost5 = 2.0
+    cost6 = 2.0
+    cost7 = 2.0
+    cost8 = 2.0
 
-    cost1 = (sum((yPSDdat .- yPSDmod).^2) / sum((yPSDdat .- mean(yPSDdat)).^2)) / 4
-
+    cost1 = (sum((yPSDdat .- yPSDmod).^2) / sum((yPSDdat .- mean(yPSDdat)).^2))
     if length(yBAPDFmod) > 0
-        cost2 = (sum((yBAPDFdat .- yBAPDFmod).^2) / sum((yBAPDFdat .- mean(yBAPDFdat)).^2)) / 4
+        cost2 = (sum((yBAPDFdat .- yBAPDFmod).^2) / sum((yBAPDFdat .- mean(yBAPDFdat)).^2))
+
+        peakDatAPDF = argmax(yBAPDFdat)
+        peakModAPDF = argmax(yBAPDFmod)
+        cost6 = abs(xBAPDFmod[peakModAPDF] - xBAPDFmod[peakDatAPDF])^2 / (xBAPDFmod[end] - xBAPDFmod[1])^2
     end
     if length(yBDPDFmod) > 0
-        cost3 = (sum((yBDPDFdat .- yBDPDFmod).^2) / sum((yBDPDFdat .- mean(yBDPDFdat)).^2)) / 4
+        cost3 = (sum((yBDPDFdat .- yBDPDFmod).^2) / sum((yBDPDFdat .- mean(yBDPDFdat)).^2))
+
+        peakDatDPDF = argmax(yBDPDFdat)
+        peakModDPDF = argmax(yBDPDFmod)
+        cost7 = abs(aBDPDF[peakModDPDF] - aBDPDF[peakDatDPDF])^2 / (aBDPDF[end] - aBDPDF[1])^2
     end
+    cost4 = (sum((yPLVdat .- yPLVmod).^2) / sum((yPLVdat .- mean(yPLVdat)).^2))
 
-    cost4 = (sum((yPLVdat .- yPLVmod).^2) / sum((yPLVdat .- mean(yPLVdat)).^2)) / 4
 
-    cost = coeffs[1]*cost1 + coeffs[2]*cost2 + coeffs[3]*cost3 + coeffs[4]*cost4
+    cost5 = abs(xPSD[peakDatPSD] - freq[peakModPSD])^2 / (xPSD[end] - xPSD[1])^2
+    cost8 = abs(xPLVmod[peakModPLV] - xPLVmod[peakDatPLV])^2 / (xPLVmod[end] - xPLVmod[1])^2
+
+    cost = coeffs[1]*cost1 + coeffs[2]*cost2 + coeffs[3]*cost3 + coeffs[4]*cost4 + coeffs[5]*cost5 + coeffs[6]*cost6 + coeffs[7]*cost7 + coeffs[8]*cost8
+    cost = cost / 8
 
     filename="costs.txt"
 
@@ -262,90 +288,62 @@ function cost_bb(params)
     return cost
 end
 
-function init_param(bounds, NPARAMS=2500)
+function init_param(bounds, P, name, NPARAMS=2500)
+    csv_path = "data/"*P*"/"*name
+
+    # Free parameters
     tau_A_dist = Uniform(bounds[1][1], bounds[1][2])
     w_EE_A_dist = Uniform(bounds[2][1], bounds[2][2])
     w_EI_A_dist = Uniform(bounds[3][1], bounds[3][2])
     w_IE_A_dist = Uniform(bounds[4][1], bounds[4][2])
     beta_A_dist = Uniform(bounds[5][1], bounds[5][2])
-    theta_E_A_dist = Uniform(bounds[6][1], bounds[6][2])
-    theta_I_A_dist = Uniform(bounds[7][1], bounds[7][2])
+    noise_A_dist = Uniform(bounds[6][1], bounds[6][2])
+    theta_E_A_dist = Uniform(bounds[7][1], bounds[7][2])
+    theta_I_A_dist = Uniform(bounds[8][1], bounds[8][2])
 
-    tau_B_dist = Uniform(bounds[8][1], bounds[8][2])
-    w_EE_B_dist = Uniform(bounds[9][1], bounds[9][2])
-    w_EI_B_dist = Uniform(bounds[10][1], bounds[10][2])
-    w_IE_B_dist = Uniform(bounds[11][1], bounds[11][2])
-    beta_B_dist = Uniform(bounds[12][1], bounds[12][2])
-    theta_E_B_dist = Uniform(bounds[13][1], bounds[13][2])
-    theta_I_B_dist = Uniform(bounds[14][1], bounds[14][2])
+    #Fixed parameters
+    etta = Float32(0.5)
+    W = [Float32(0.0) Float32(1.0); Float32(1.0) Float32(0.0)]
+    stim_mag = Float32(0.0)
 
-    etta_dist = Uniform(bounds[15][1], bounds[15][2])
-    w12_dist = Uniform(bounds[16][1], bounds[16][2])
-    w21_dist = Uniform(bounds[17][1], bounds[17][2])
-
-    psd_df = CSV.read("data/psd.csv", DataFrame)
+    psd_df = CSV.read(csv_path*"/psd.csv", DataFrame)
     xPSD = psd_df[!, 1]
     yPSDdat = psd_df[!, 2]
     peakDat = argmax(yPSDdat)
 
-    csv_df_w = DataFrame(
-        etta = [0.0], w12 = [0.0], w21 = [0.0],
-        tau_A=[0.0], w_EE_A=[0.0], w_EI_A=[0.0], w_IE_A=[0.0], beta_A=[0.0], theta_E_A=[0.0], theta_I_A=[0.0],
-        tau_B=[0.0], w_EE_B=[0.0], w_EI_B=[0.0], w_IE_B=[0.0], beta_B=[0.0], theta_E_B=[0.0], theta_I_B=[0.0]
-    )
-    CSV.write("data/params-wc.csv", csv_df_w)
+    #csv_df_w = DataFrame(tau=[0.0], w_EE=[0.0], w_EI=[0.0], w_IE=[0.0], beta=[0.0], noise=[0.0], theta_E=[0.0], theta_I=[0.0])
+    #CSV.write(csv_path*"/params.csv", csv_df_w)
 
     count = 0
-
     while count < NPARAMS
-        etta_p = 0.5
-        w12_p = 1.0
-        w21_p = 1.0
-
         tau_A_p = Float32(rand(tau_A_dist))
         w_EE_A_p = Float32(rand(w_EE_A_dist))
         w_EI_A_p = Float32(rand(w_EI_A_dist))
         w_IE_A_p = Float32(rand(w_IE_A_dist))
         beta_A_p = Float32(rand(beta_A_dist))
+        noise_p = Float32(rand(noise_A_dist))
         theta_E_A_p = Float32(rand(theta_E_A_dist))
         theta_I_A_p = Float32(rand(theta_I_A_dist))
 
-        #tau_B_p = Float32(rand(tau_B_dist))
-        #w_EE_B_p = Float32(rand(w_EE_B_dist))
-        #w_EI_B_p = Float32(rand(w_EI_B_dist))
-        #w_IE_B_p = Float32(rand(w_IE_B_dist))
-        #beta_B_p = Float32(rand(beta_B_dist))
-        #theta_E_B_p = Float32(rand(theta_E_B_dist))
-        #theta_I_B_p = Float32(rand(theta_I_B_dist))
-
-        tau_B_p = tau_A_p
-        w_EE_B_p = w_EE_A_p
-        w_EI_B_p = w_EI_A_p
-        w_IE_B_p = w_IE_A_p
-        beta_B_p = beta_A_p
-        theta_E_B_p = Float32(rand(theta_E_B_dist))
-        theta_I_B_p = Float32(rand(theta_I_B_dist))
-
-        node_A = create_benoit_node(tau_A_p, tau_A_p, w_EE_A_p, w_EI_A_p, w_IE_A_p, beta_A_p)
-        node_B = create_benoit_node(tau_B_p, tau_B_p, w_EE_B_p, w_EI_B_p, w_IE_B_p, beta_B_p)
-        model = create_benoit_network([node_A, node_B], [Float32(0.0) Float32(w12_p); Float32(w21_p) Float32(0.0)], Float32(etta_p))
+        node_A = create_benoit_node(tau_A_p, tau_A_p, w_EE_A_p, w_EI_A_p, w_IE_A_p, beta_A_p, noise_p)
+        node_B = create_benoit_node(tau_A_p, tau_A_p, w_EE_A_p, w_EI_A_p, w_IE_A_p, beta_A_p, noise_p)
+        model = create_benoit_network([node_A, node_B], W, etta, noise_p, stim_mag)
 
         T = 100.0
         dt = 0.001
         range_t = 0.0:dt:T
-        response = fill(0.0, length(range_t)) 
-        #for i in 1:6:T-6
-        #    #Start pulse
-        #    for j in 0:24
-        #        for k in 0:2:10
-        #            response[Int64(trunc(i*1000+j*200+k*(1000/130)))] = 0.001684
-        #        end
-        #    end
-        #end
-        theta_E = [theta_E_A_p, theta_E_B_p]
-        theta_I = [theta_I_A_p, theta_I_B_p]
-        stim = response
-        df = run_act_time(model, simulate_benoit_model, range_t, dt, theta_E, theta_I, stim)
+        theta_E = [theta_E_A_p, theta_E_A_p]
+        theta_I = [theta_I_A_p, theta_I_A_p]
+
+        stimBlock = create_stim_block(100.0, 100, 100, 10, 1)
+        SR = 1000.0
+        gamma_param = 0.1 # or 0.05
+        OT_suppress = 0.3
+        target_phase = pi / 2.0
+        target_freq = 10.0
+        oscilltracker = Oscilltracker(target_freq, target_phase, SR, OT_suppress, gamma_param)
+
+        df = run_act_time(model, simulate_benoit_model, range_t, dt, theta_E, theta_I, oscilltracker, stimBlock)
 
         #zscore
         Eproc = df.R[1].rE .- mean(df.R[1].rE) / std(df.R[1].rE)
@@ -356,13 +354,11 @@ function init_param(bounds, NPARAMS=2500)
 
         if abs(xPSD[peakDat] - freq[peakMod]) <= 1.0 && abs(yPSDmod[peakMod] - yPSDdat[peakDat]) <= 0.25*yPSDdat[peakDat]
             new_row= (
-                etta=etta_p, w12=w12_p, w21=w21_p,
-                tau_A=tau_A_p, w_EE_A=w_EE_A_p, w_EI_A=w_EI_A_p, w_IE_A=w_IE_A_p, beta_A=beta_A_p, theta_E_A=theta_E_A_p, theta_I_A=theta_I_A_p,
-                tau_B=tau_B_p, w_EE_B=w_EE_B_p, w_EI_B=w_EI_A_p, w_IE_B=w_IE_B_p, beta_B=beta_B_p, theta_E_B=theta_E_B_p, theta_I_B=theta_I_B_p
-            )
-            df_csv_r = CSV.read("data/params-2.csv", DataFrame)
+                tau=tau_A_p, w_EE=w_EE_A_p, w_EI=w_EI_A_p, w_IE=w_IE_A_p, beta=beta_A_p, noise=noise_p, theta_E=theta_E_A_p, theta_I=theta_I_A_p,
+             )
+            df_csv_r = CSV.read(csv_path*"/params.csv", DataFrame)
             push!(df_csv_r, new_row)
-            CSV.write("data/params-2.csv", df_csv_r)
+            CSV.write(csv_path*"/params.csv", df_csv_r)
             count += 1
             print("Added " * string(count) * " / 2500 parameters\n")
             print("pmidx: " * string(peakMod) * "pdidx: " * string(peakDat) * "peak mod: " * string(freq[peakMod]) * " peak dat: " * string(xPSD[peakDat]) * " diff: " * string(abs(xPSD[peakDat] - freq[peakMod])) * " " * string(abs(yPSDmod[peakMod] - yPSDdat[peakDat])) * " " * string(0.25*yPSDdat[peakDat]) * "\n")
@@ -592,10 +588,11 @@ function init_param_wc_single(bounds, NPARAMS=2500)
     end
 end
 
-function opt_param()
-    best_params = [[],[],[],[],[],[],[],[],[],[]]
-    best_costs = [1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0, 1000.0]
-    df_csv_r = CSV.read("data/params.csv", DataFrame)
+function opt_param(P, name, N)
+    best_params = [[] for i in 1:N]
+    best_costs = [1000.0 for i in 1:N]
+    csv_path = "data/"*P*"/"*name
+    df_csv_r = CSV.read(csv_path*"/params.csv", DataFrame)
     for (i, row) in enumerate(eachrow(df_csv_r))
         p = [v for v in values(df_csv_r[i,:])]
         cost = cost_bb(p)
@@ -603,13 +600,14 @@ function opt_param()
         max_index = argmax(best_costs)
         if cost < best_costs[max_index]
             best_costs[max_index] = cost
-            best_params[max_index] = p
-            println("Costs: ", best_costs)   
+            best_params[max_index] = p  
+            println("Cost: " * string(cost) * "\n")
         end
     end
     for (i, p) in enumerate(best_params)
-        println("Best params ", i, ": ", p)
+        println("Best params ", i, ": ", p, ", Cost: ", best_costs[i])
     end
+    return best_params[1]
 end
 
 function rosenbrock2d(x)
@@ -669,3 +667,35 @@ end
 #p_range = [(23.09, 23.11), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0), (0.0, 1.0), (0.0, 10.0), (-2.0, 10.0), (-10.0, 2.0)]
 #res = bboptimize(cost_bb_bc; SearchRange=p_range)
 
+function O(P, name, mode)
+    p_bounds=[
+            (0.016, 0.017),
+            (0.0, 10.0),
+            (0.0, 10.0),
+            (0.0, 10.0),
+            (0.0, 10.0),
+            (0.0, 0.3),
+            (-2.0, 10.0),
+            (-10.0, 2.0)
+        ]
+    if mode == "init"
+        init_param(p_bounds, P, name, 100)
+    elseif mode == "bp"
+        opt_param(P, name, 1)
+    elseif mode == "opt"
+        good_guess = [0.01658759079873562,1.9765267372131348,7.805781841278076,8.708059310913086,8.914440155029297,0.16979466378688812,7.87988805770874,-5.185361862182617]
+        res = bboptimize(cost_bb, good_guess; SearchRange=p_bounds, MaxSteps=2500)
+        filename="./jobs-out/"*P*"-"*name*".txt"
+
+        fileID = open(filename, "w")
+        println(fileID, best_candidate(res))
+        close(fileID)
+    end
+end
+
+ function main(args)
+    O(args[1], args[2], "opt")
+ end
+
+ O("P4", "05_02_2024_P4_Ch14_FRQ=11Hz_FULL_CL_phase=0_REST_EC_v1", "opt")
+ #main(ARGS)

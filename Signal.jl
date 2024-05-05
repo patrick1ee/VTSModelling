@@ -59,7 +59,7 @@ module Signal
 
         freq, power = get_pow_spec(sig)
         freqSize = length(freq)
-        peak_freq = 0.0
+        peak_freq = LOW_FREQ
         peak_spec = 0.0
         for i in 1:freqSize
             if freq[i] >= LOW_FREQ && freq[i] <= HIGH_FREQ && power[i] > peak_spec
@@ -122,7 +122,6 @@ module Signal
         burst_amp = 0.0
         burst = false
         threshold = percentile(signal_mod, 20)
-        print(threshold)
         signalSize = length(signal_mod)
         for i in 1:signalSize
             if signal_mod[i] >= threshold
@@ -160,7 +159,7 @@ module Signal
             println("Error: ", err)
             println("Amps: ", burst_amps)
             println("Durations: ", burst_durations)
-            return [], [], []
+            return [], [], [], [], [], []
         end
     end
 
@@ -171,7 +170,7 @@ module Signal
         target_phase = 0.0
 
         Lt = length(signal)
-        osc = Oscilltracker(target_freq, target_phase, SR, OT_suppress, gamma_param)
+        osc = Oscilltracker(Float64(target_freq), target_phase, SR, OT_suppress, gamma_param)
         phase = zeros(Lt)
         for i in 1:Lt
             update!(osc, Float64(signal[i]))
@@ -192,7 +191,7 @@ module Signal
             plv = abs(mean(exp.(1im*(p1f .- p2f))))
             push!(plvs, plv)
         end
-        return plvs
+        return freqs, plvs
     end
 
 end

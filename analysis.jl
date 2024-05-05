@@ -646,4 +646,4 @@ end
 #analysis.analyse_all_flat()
 #analysis.get_raw("P20", "15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1", 2001, 3000)
 #analysis.get_beta_burst_process("P20", "15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1")
-analysis.plot_example_bursts()
+#analysis.plot_example_bursts()
