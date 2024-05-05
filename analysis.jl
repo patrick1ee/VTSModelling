@@ -4,7 +4,7 @@ module analysis
 
     using ApproxFun, Base.Filesystem, CSV, DataFrames, DSP, FFTW, HDF5, Interpolations, KissSmoothing, LPVSpectral, LsqFit, Measures, NaNStatistics, Plots, StatsBase, Statistics
 
-    using .Signal: get_bandpassed_signal, get_beta_data, get_pow_spec, get_hilbert_amplitude_pdf, get_burst_durations, get_signal_phase
+    using .Signal: get_bandpassed_signal, get_beta_data, get_pow_spec, get_hilbert_amplitude_pdf, get_burst_profiles, get_signal_phase
 
     const SR = 1000  # recording sampling rate in Hz, do not change this
 
@@ -208,24 +208,21 @@ module analysis
         x, y, ha = get_hilbert_amplitude_pdf(signal, bandwidth=bandwidth)
         S, N = denoise(convert(AbstractArray{Float64}, ha))
 
-        csv_df = DataFrame(x=x,y=y)
-        CSV.write(csv_path*"/bapdf.csv", csv_df)
-
-        plot(x, y, xlabel="amplitude", ylim=(0.0, 2.0), xlim=(0, 6), xticks=0:2:6, yticks=0:0.5:2.0, size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
-        savefig(plot_path*"/bapdf.png")
-
         csv_df = DataFrame(x=1:length(signal),y=S)
         CSV.write(csv_path*"/bamp.csv", csv_df)
-
         plot(1:length(signal), S, xlabel="time", size=(500,500), xlim=(0, 10000), xticks=0:2000:10000, linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
         savefig(plot_path*"/bamp.png")
 
-        bx, by, burst_durations = get_burst_durations(S)
+        ax, ay, dx, dy, burst_amps, burst_durations = get_burst_profiles(S)
 
-        csv_df = DataFrame(x=bx,y=by)
+        csv_df = DataFrame(x=ax,y=ay)
+        CSV.write(csv_path*"/bapdf.csv", csv_df)
+        plot(ax, ay, xlabel="amplitude", ylim=(0.0, 2.0), xlim=(0, 6), xticks=0:2:6, yticks=0:0.5:2.0, size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+        savefig(plot_path*"/bapdf.png")
+
+        csv_df = DataFrame(x=dx,y=dy)
         CSV.write(csv_path*"/bdpdf.csv", csv_df)
-
-        plot(bx, by, xlabel="duration", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+        plot(dx, dy, xlabel="duration", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
         savefig(plot_path*"/bdpdf.png")
     end
 
@@ -235,14 +232,15 @@ module analysis
         for f in freqs
             s1f = get_bandpassed_signal(s1, f-0.5, f+0.5)
             s2f = get_bandpassed_signal(s2, f-0.5, f+0.5)
-            p1f = get_signal_phase(s1f)
-            p2f = get_signal_phase(s2f)
+            t= time()
+            p1f = get_signal_phase(s1f, Float64(f))
+            p2f = get_signal_phase(s2f, Float64(f))
             plv = abs(mean(exp.(1im*(p1f .- p2f))))
             push!(plvs, plv)
         end
 
-        p1 = get_signal_phase(s1)
-        p2 = get_signal_phase(s2)
+        p1 = angle.(hilbert(s1))
+        p2 = angle.(hilbert(s2))
 
         csv_df = DataFrame(x=1:length(s1),y=p1)
         CSV.write(csv_path*"/p1.csv", csv_df)
@@ -351,7 +349,7 @@ module analysis
             
             x, y, ha = get_hilbert_amplitude_pdf(slice_data_flt_beta)
             S, N = denoise(convert(AbstractArray{Float64}, ha))
-            bx, by, burst_durations = get_burst_durations(S)
+            bx, by, burst_durations = get_burst_profiles(S)
 
             push!(xBAPDF, x)
             push!(yBAPDF, y)
@@ -435,14 +433,14 @@ module analysis
 
                     data_raw_alt = (data_raw_alt .- mean(data_raw_alt)) ./ std(data_raw_alt)
                     
-                    run_spec(data_raw, plot_path, csv_path)
-                    run_beta_burst(data_flt_beta, plot_path, csv_path)
+                    #run_spec(data_raw, plot_path, csv_path)
+                    #run_beta_burst(data_flt_beta, plot_path, csv_path)
                     run_plv(data_raw, data_raw_alt, plot_path, csv_path)
 
-                    plot(1:length(data_raw), data_raw, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
-                    savefig(plot_path*"/raw.png")
-                    plot(1:length(data_flt_beta), data_flt_beta, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
-                    savefig(plot_path*"/flt-beta.png")
+                    #plot(1:length(data_raw), data_raw, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+                    #savefig(plot_path*"/raw.png")
+                    #plot(1:length(data_flt_beta), data_flt_beta, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+                    #savefig(plot_path*"/flt-beta.png")
 
                     fcount += 1
                     println("Processed $fcount files.")
@@ -497,7 +495,155 @@ module analysis
         csv_df = DataFrame(x=1:length(data_raw),y=data_raw)
         CSV.write("./raw.csv", csv_df)
     end
+
+    function get_beta_burst_process(P, name)
+        data_path = "Patrick_data"
+
+        fid = h5open(data_path*"/"*P*"/"*name*".hdf5", "r")
+        data = read(fid["EEG"])
+        close(fid)
+
+        CONST_REF_CHAN = "CP1_local"
+        CONST_ALT_CHAN = "CP2_local"
+
+        data_outlierRem = parse_eeg_data(data, CONST_REF_CHAN)
+        data_flt_beta = get_beta_data(data_outlierRem)
+        data_raw = data_outlierRem
+
+        #zscore
+        data_raw = (data_raw .- mean(data_raw)) ./ std(data_raw)
+        data_flt_beta = (data_flt_beta .- mean(data_flt_beta)) ./ std(data_flt_beta)
+        
+        x, y, ha = get_hilbert_amplitude_pdf(data_flt_beta)
+        S, N = denoise(convert(AbstractArray{Float64}, ha))
+
+        threshold = percentile(S, 20)
+        
+        Sc = [S[i] for i in 1:length(S)]
+        for i in 1:length(Sc)
+            if Sc[i] < threshold
+                Sc[i] = threshold
+            end
+        end
+
+        plot(
+            1:length(S), 
+            S, 
+            xlabel="time (ms)", 
+            ylabel="amplitude", 
+            xlim=(0, 2500),
+            xticks=0:500:2500,
+            size=(500,500), 
+            linewidth=1.5, 
+            xtickfont=12, 
+            ytickfont=12, 
+            legend=false, 
+            titlefont=12, 
+            guidefont=12, 
+            tickfont=12, 
+            title="Beta Bursts Cut-off",
+            color="grey",
+            right_margin=5Plots.mm
+        )
+        plot!(
+            1:length(S), 
+            Sc,
+            c=1,
+            linewidth=1.5,
+        )
+        plot!(
+            1:length(S), 
+            [threshold for i in 1:length(S)], 
+            linewidth=3, 
+            color="black",
+            legend=false, 
+        )
+        plot!(
+            1:length(S),
+            [0 for i in 1:length(S)],
+            linewidth=0,
+            fillrange = [threshold for i in 1:length(S)], 
+            fillalpha = 0.25,
+            colour="black"
+        )
+        #=plot!(
+            1:length(S),
+            [threshold for i in 1:length(S)],
+            linewidth=0,
+            fillrange = [4.0 for i in 1:length(S)], 
+            fillalpha = 0.05,
+            color="green"
+        )
+        plot!(
+            1:length(S), 
+            [threshold for i in 1:length(S)], 
+            linewidth=2, 
+            color="red",
+            linestyle=:dash,
+            legend=false, 
+        )=#
+        savefig("./plots/diss/beta-burst-process-1.png")
+    end
+
+    function plot_example_bursts()
+        data_path = "Patrick_data"
+
+        # Define the size of the time-window for computing the ERP (event-related potential)
+        ERP_tWidth = 1  # [sec]
+        ERP_tOffset = ERP_tWidth / 2  # [sec]
+        ERP_LOWPASS_FILTER = 30  # set to nan if you want to deactivate it
+
+        POW_SPECTRUM_FREQS = 6:55  # in Hz
+
+        fcount = 0
+
+        data_path = "Patrick_data/"
+        for (root, dirs, files) in walkdir(data_path)
+            for file in files
+                if endswith(file, ".hdf5")
+                    if rand(Int) % 7 > 0
+                        continue
+                    end
+
+                    full = joinpath(root, file)
+                    P = split(full, "/")[2]
+                    F = split(split(full, "/")[3], ".")[1]
+                    
+                    csv_path = "data/"*P*"/"*F
+
+                    csv_df = CSV.read(csv_path*"/bdpdf.csv", DataFrame)
+                    x = csv_df[!, 1] .* 1000.0
+                    y = csv_df[!, 2]
+                    plot!(
+                        x,
+                        y, 
+                        size=(500,500),
+                        xlim=(0, 1000),
+                        xlabel="Duration (ms)",
+                        title="Beta Burst Duration PDFs",
+                        linewidth=3, 
+                        xtickfont=12, 
+                        ytickfont=12, 
+                        legend=false, 
+                        titlefont=12, 
+                        guidefont=12, 
+                        tickfont=12,
+                    )
+
+                    fcount += 1
+                    println("Processed $fcount files.")
+                    if fcount > 4
+                        savefig("plots/diss/beta-burst-dpdfs.png")
+                        return
+                    end
+                end
+            end
+        end
+        return
+    end
 end
 
 #analysis.analyse_all_flat()
 #analysis.get_raw("P20", "15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1", 2001, 3000)
+#analysis.get_beta_burst_process("P20", "15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1")
+analysis.plot_example_bursts()

@@ -130,7 +130,7 @@ module Oscilltrack
         gamma_param = 0.1 # or 0.05
         OT_suppress = 0.3
         target_phase = 0.0001
-        target_freq = 5.0
+        target_freq = 10.0
 
         A = 1.0
         f = 5.0
@@ -144,10 +144,10 @@ module Oscilltrack
             S[i] = A * cos(f * 2 * pi * range_t[i]/1000.0 + phase) + base
         end
 
-        #df_csv = CSV.read("./raw.csv", DataFrame) 
-        #S = df_csv[!, 2]
-        #Lt = length(S)
-        #range_t = 0:1.0:Lt-1
+        df_csv = CSV.read("./raw.csv", DataFrame) 
+        S = df_csv[!, 2]
+        Lt = length(S)
+        range_t = 0:1.0:Lt-1
 
         hilbert_transform = hilbert(S)
         #hilbert_env = unwrap(abs.(hilbert_transform))
@@ -169,24 +169,25 @@ module Oscilltrack
         plot(
             range_t, 
             S,
-            title="Phase Tracking",
+            title="Phase-locked Stimulation",
             xlabel="Time (ms)",
-            size=(1000,500),
+            size=(500,500),
             xlim=(0, 500),
-            linewidth=4,
+            linewidth=0.75,
             xtickfont=12,
             ytickfont=12,
             titlefont=12,
             guidefont=12,
             tickfont=12,
-            label="Signal"
+            label="EEG",
+            right_margin=5Plots.mm
         )
         plot!(
             range_t, 
             phase,
-            title="Phase Tracking",
+            title="Phase-locked Stimulation",
             xlabel="Time (ms)",
-            size=(1000,500),
+            size=(500,500),
             xlim=(0, 500),
             linewidth=1,
             xtickfont=12,
@@ -195,26 +196,29 @@ module Oscilltrack
             titlefont=12,
             guidefont=12,
             tickfont=12,
-            label="Tracked Phase"
+            label="Phase",
+            right_margin=5Plots.mm
         )
         plot!(
             range_t, 
-            hilbert_phase,
-            title="Phase Tracking",
+            stim,
+            title="Phase-locked Stimulation",
             xlabel="Time (ms)",
-            size=(1500,500),
-            xlim=(0, 750),
-            linewidth=1,
-            xtickfont=16,
-            ytickfont=16,
-            titlefont=16,
-            guidefont=16,
-            tickfont=16,
-            legendfont=16,
-            label="Hilbert Phase"
+            size=(500,500),
+            xlim=(0, 500),
+            xticks=0:250:500,
+            linewidth=4,
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=8,
+            label="Stim",
+            right_margin=5Plots.mm
         )
-        savefig("plots/diss/pt-track-hilbert-1.png")
+        savefig("plots/diss/pls-eeg-1.png")
     end
 end
 
-Oscilltrack.test_oscilltrack()
+#Oscilltrack.test_oscilltrack()

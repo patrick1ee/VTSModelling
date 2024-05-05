@@ -4,7 +4,7 @@ module Signal
     using .Oscilltrack: Oscilltracker, update!, get_phase
     using DSP, FFTW, KernelDensity, KissSmoothing, StatsBase, Statistics
 
-    export get_bandpassed_signal, get_beta_data, get_pow_spec, get_hilbert_amplitude_pdf, get_burst_durations, get_signal_phase, get_plv_freq
+    export get_bandpassed_signal, get_beta_data, get_pow_spec, get_hilbert_amplitude_pdf, get_burst_profiles, get_signal_phase, get_plv_freq
 
     function interpolate_nan(arr)
         Larr = length(arr)
@@ -112,25 +112,35 @@ module Signal
         end
     end
 
-    function get_burst_durations(signal, threshold=0.5)
+    function get_burst_profiles(signal)
+        signal_mod = abs.(signal)
         burst_durations = []
+        burst_amps = []
         burst_start = 0
         burst_end = 0
         burst_duration = 0 #ms
+        burst_amp = 0.0
         burst = false
-        signalSize = length(signal)
+        threshold = percentile(signal_mod, 20)
+        print(threshold)
+        signalSize = length(signal_mod)
         for i in 1:signalSize
-            if signal[i] >= threshold
+            if signal_mod[i] >= threshold
                 if !burst
                     burst_start = i
                     burst = true
+                    burst_amp = 0.0
                 else
                     burst_duration += 1
+                end
+                if signal_mod[i] > burst_amp
+                    burst_amp = signal_mod[i]
                 end
             else
                 if burst && burst_duration >= 100
                     burst_end = i
                     push!(burst_durations, burst_duration)
+                    push!(burst_amps, burst_amp)
                     burst = false
                 end
                 burst_duration = 0
@@ -138,23 +148,27 @@ module Signal
         end
 
         burst_durations = burst_durations ./ 1000
+        burst_amps = [x for x in burst_amps if isa(x, Float64)]
+        burst_durations = [x for x in burst_durations if isa(x, Float64) && x > 0.0]
 
         try
-            U = kde(burst_durations)
-            return U.x, U.density, burst_duration
+
+            U_amp = kde(burst_amps)
+            U_dur = kde(burst_durations)
+            return U_amp.x, U_amp.density, U_dur.x, U_dur.density, burst_amps, burst_durations
         catch err
             println("Error: ", err)
-            println("Data: ", burst_duration)
+            println("Amps: ", burst_amps)
+            println("Durations: ", burst_durations)
             return [], [], []
         end
     end
 
-    function get_signal_phase(signal)
+    function get_signal_phase(signal, target_freq)
         SR = 1000.0
         gamma_param = 0.1 # or 0.05
         OT_suppress = 0.3
         target_phase = 0.0
-        target_freq = 10.0
 
         Lt = length(signal)
         osc = Oscilltracker(target_freq, target_phase, SR, OT_suppress, gamma_param)
@@ -173,8 +187,8 @@ module Signal
         for f in freqs
             s1f = get_bandpassed_signal(s1, f-0.5, f+0.5)
             s2f = get_bandpassed_signal(s2, f-0.5, f+0.5)
-            p1f = get_signal_phase(s1f)
-            p2f = get_signal_phase(s2f)
+            p1f = get_signal_phase(s1f, f)
+            p2f = get_signal_phase(s2f, f)
             plv = abs(mean(exp.(1im*(p1f .- p2f))))
             push!(plvs, plv)
         end
