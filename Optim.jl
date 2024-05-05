@@ -147,6 +147,15 @@ function cost_bb_bc(params)
     return cost
 end
 
+
+SR = 1000.0
+stimBlock = create_stim_block(100.0, 25, 25, 0.0:dt:100.0, 1)
+gamma_param = 0.1 # or 0.05
+OT_suppress = 0.3
+target_phase = pi / 2.0
+target_freq = 10.0
+oscilltracker = Oscilltracker(target_freq, target_phase, SR, OT_suppress, gamma_param)
+
 function cost_bb(params)
     P= ARGS[1]
     name = ARGS[2]
@@ -176,25 +185,17 @@ function cost_bb(params)
     w_IE = Float32(params[4])
     beta = Float32(params[5])
     noise_dev = Float32(params[6])
-    stim_mag = Float32(0.0)
-    theta_E_A_param = Float32(params[7])
-    theta_I_A_param = Float32(params[8])
-    theta_E_B_param = Float32(params[7])
-    theta_I_B_param = Float32(params[8])
+    stim_mag = Float32(params[7])
+    theta_E_A_param = Float32(params[8])
+    theta_I_A_param = Float32(params[9])
+    theta_E_B_param = Float32(params[8])
+    theta_I_B_param = Float32(params[9])
 
     model = create_benoit_model(N, W, etta, tau_E, tau_I, w_EE, w_EI, w_IE, beta, noise_dev, stim_mag)
     
     T = 100.0
     dt = 0.001
     range_t = 0.0:dt:T
-
-    SR = 1000.0
-    stimBlock = create_stim_block(100.0, 100, 100, 10, 1)
-    gamma_param = 0.1 # or 0.05
-    OT_suppress = 0.3
-    target_phase = pi / 2.0
-    target_freq = 10.0
-    oscilltracker = Oscilltracker(target_freq, target_phase, SR, OT_suppress, gamma_param)
 
     theta_E = [theta_E_A_param, theta_E_B_param]
     theta_I = [theta_I_A_param, theta_I_B_param]
@@ -660,6 +661,7 @@ function O(P, name, mode)
             (0.0, 10.0),
             (0.0, 10.0),
             (0.0, 0.3),
+            (0.0, 0.5),
             (-2.0, 10.0),
             (-10.0, 2.0)
         ]
@@ -668,8 +670,8 @@ function O(P, name, mode)
     elseif mode == "bp"
         opt_param(P, name, 1)
     elseif mode == "opt"
-        good_guess = [0.0167907, 1.84502, 8.10264, 4.90234, 3.76054, 0.0673752, 0.275149, -2.27837]
-        res = bboptimize(cost_bb, good_guess; SearchRange=p_bounds, MaxSteps=5)
+        good_guess = [0.0167907, 1.84502, 8.10264, 4.90234, 3.76054, 0.0673752, 0.001, 0.275149, -2.27837]
+        res = bboptimize(cost_bb, good_guess; SearchRange=p_bounds)
         filename="./jobs-out/"*P*"-"*name*".txt"
 
         fileID = open(filename, "w")
@@ -683,4 +685,4 @@ end
  end
 
  #O("P4", "05_02_2024_P4_Ch14_FRQ=11Hz_FULL_CL_phase=0_REST_EC_v1", "opt")
- #main(ARGS)
+ main(ARGS)
