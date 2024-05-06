@@ -8,7 +8,7 @@ include("./Signal.jl")
 include("./Optim.jl")
 include("./Oscilltrack.jl")
 
-using ControlSystems, CSV, CurveFit, DataFrames, DSP, FFTW, KernelDensity, LsqFit, Measures, NeuralDynamics, Plots, Statistics, StatsBase
+using Base.Filesystem, ControlSystems, CSV, CurveFit, DataFrames, DSP, FFTW, KernelDensity, LsqFit, Measures, NeuralDynamics, Plots, Statistics, StatsBase
 using .RafalModel: create_rafal_model, simulate_rafal_model
 using .BenoitModel: create_benoit_model, simulate_benoit_model
 using .ByrneModel: create_byrne_pop, create_byrne_pop_EI, create_byrne_node, create_byrne_network, create_if_pop, simulate_if_pop, simulate_byrne_EI_network
@@ -877,12 +877,26 @@ end
 #main_byrne()
 #plot_data_model_features("data/P7/06_02_2024_P7_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1")
 
+
+#p = [0.0167907, 1.84502, 8.10264, 4.90234, 3.76054, 0.0673752, 0.0, 0.275149, -2.27837]
 p = [0.0167907, 1.84502, 8.10264, 4.90234, 3.76054, 0.0673752, 0.27402, 0.275149, -2.27837]
 ps = [0.0162904, 0.434542, 6.39134, 6.7426, 5.9051, 0.264186, 0.27402, 0.933472, -5.18417]
-main_raf(p)
-main_raf(ps, csv_path = "data/model-stim")
+for i in 1:100
+    mkdir("data/model-inc-stim/"*string(i))
+    main_raf(ps, csv_path = "data/model-inc-stim/"*string(i))
+    println("Iteration: ", i)
+end
+for i in 1:100
+    mkdir("data/model-plus-stim/"*string(i))
+    main_raf(p, csv_path = "data/model-plus-stim/"*string(i))
+    println("Iteration: ", i)
+end
+
+#main_raf(p)
+#main_raf(ps, csv_path = "data/model-stim")
+#plot_data_model_features("data/P11/08_02_2024_P11_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v2")
 #plot_data_model_features("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1")
-plot_data_model_features_stim("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=180_STIM_EC_v1")
+#plot_data_model_features_stim("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=180_STIM_EC_v1")
 #plot_data_model_features("data/P9/07_02_2024_P9_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v2")
 #plot_data_model_features("data/P4/05_02_2024_P4_Ch14_FRQ=11Hz_FULL_CL_phase=0_REST_EC_v1")
 

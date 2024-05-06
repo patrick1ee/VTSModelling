@@ -2,7 +2,7 @@ module analysis
 
     include("./Signal.jl")
 
-    using ApproxFun, Base.Filesystem, CSV, DataFrames, DSP, FFTW, HDF5, Interpolations, KissSmoothing, LPVSpectral, LsqFit, Measures, NaNStatistics, Plots, StatsBase, Statistics
+    using ApproxFun, Base.Filesystem, CSV, DataFrames, DSP, FFTW, HDF5, Interpolations, KernelDensity, KissSmoothing, LPVSpectral, LsqFit, Measures, NaNStatistics, Plots, StatsBase, StatsPlots, Statistics
 
     using .Signal: get_bandpassed_signal, get_beta_data, get_pow_spec, get_hilbert_amplitude_pdf, get_burst_profiles, get_signal_phase
 
@@ -641,9 +641,838 @@ module analysis
         end
         return
     end
+
+    function plot_feature_ribbons(csv_data_path)
+         # Load data
+        df_psd_data = CSV.read(csv_data_path*"/psd.csv", DataFrame)   
+        df_beta_amp_pdf_data = CSV.read(csv_data_path*"/bapdf.csv", DataFrame)
+        df_beta_dur_pdf_data = CSV.read(csv_data_path*"/bdpdf.csv", DataFrame)
+        df_plvs_data = CSV.read(csv_data_path*"/plvs.csv", DataFrame)
+
+        yPSDs = [[] for i in 1:100]
+        freq = []
+        yBAPDFS = [[] for i in 1:100]
+        xBAPDF = []
+        yBDPDFS = [[] for i in 1:100]
+        xBDPDF = []
+        yPLV = [[] for i in 1:100]
+        xPLV = []
+        for i in 1:100
+            csv_path = "data/model/"*string(i)
+
+            psd_df = CSV.read(csv_path*"/psd.csv", DataFrame)
+            freq = xPSD = psd_df[!, 1]
+            yPSDdat = psd_df[!, 2]
+            yPSDs[i]=  yPSDdat
+
+            bapdf_df = CSV.read(csv_path*"/bapdf.csv", DataFrame)
+            xBAPDF = bapdf_df[!, 1]
+            yBAPDFdat = bapdf_df[!, 2]
+            yBAPDFS[i] = yBAPDFdat
+
+            bdpdf_df = CSV.read(csv_path*"/bdpdf.csv", DataFrame)
+            xBDPDF = bdpdf_df[!, 1]
+            yBDPDFdat = bdpdf_df[!, 2]
+            yBDPDFS[i] = yBDPDFdat
+
+            plvs_df = CSV.read(csv_path*"/plvs.csv", DataFrame)
+            xPLV = plvs_df[!, 1]
+            yPLVdat = plvs_df[!, 2]
+            yPLV[i] = yPLVdat
+        end
+
+        psd_stds = []
+        for i in 1:length(yPSDs[1])
+            y = [yPSDs[j][i] for j in 1:100]
+            push!(psd_stds, std(y))
+        end
+
+        bapdf_stds = []
+        for i in 1:length(yBAPDFS[1])
+            y = [yBAPDFS[j][i] for j in 1:100]
+            push!(bapdf_stds, std(y))
+        end
+
+        bdpdf_stds = []
+        for i in 1:length(yBDPDFS[1])
+            y = [yBDPDFS[j][i] for j in 1:100]
+            push!(bdpdf_stds, std(y))
+        end
+
+        plv_stds = []
+        for i in 1:length(yPLV[1])
+            y = [yPLV[j][i] for j in 1:100]
+            push!(plv_stds, std(y))
+        end
+
+        plot(
+            df_psd_data[!, 1],
+            df_psd_data[!, 2], 
+            xlabel="Frequency (Hz)",
+            title="Power Spectral Density",
+            label="data",
+            size=(500, 500),
+            linewidth=3,
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        plot!(
+            freq,
+            mean(yPSDs, dims=1), 
+            ribbon=psd_stds,
+            fillalpha=.3,
+            xlabel="Frequency (Hz)",
+            title="Power Spectral Density",
+            label="model",
+            size=(500, 500),
+            linewidth=3,
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        savefig("psd-rib.png")
+
+        plot(
+            df_beta_amp_pdf_data[!, 1],
+            df_beta_amp_pdf_data[!, 2], 
+            xlabel="Amplitude",
+            title="Beta Amplitude PDF",
+            label="data",
+            size=(500, 500),
+            linewidth=3,
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        plot!(
+            xBAPDF,
+            mean(yBAPDFS, dims=1), 
+            ribbon=bapdf_stds,
+            fillalpha=.3,
+            xlabel="Amplitude",
+            title="Beta Amplitude PDF",
+            label="model",
+            size=(500, 500),
+            linewidth=3,
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        savefig("bapdf-rib.png")
+
+        plot(
+            df_beta_dur_pdf_data[!, 1],
+            df_beta_dur_pdf_data[!, 2], 
+            xlabel="Duration",
+            title="Beta Duration PDF",
+            label="data",
+            size=(500, 500),
+            linewidth=3,
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        plot!(
+            xBDPDF,
+            mean(yBDPDFS, dims=1), 
+            ribbon=bdpdf_stds,
+            fillalpha=.3,
+            xlabel="Duration",
+            title="Beta Duration PDF",
+            label="model",
+            size=(500, 500),
+            linewidth=3,
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        savefig("bdpdf-rib.png")
+
+        plot(
+            df_plvs_data[!, 1],
+            df_plvs_data[!, 2], 
+            xlabel="Frequency",
+            title="Phase Locking Value",
+            label="data",
+            size=(500, 500),
+            linewidth=3,
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        plot!(
+            xPLV,
+            mean(yPLV, dims=1), 
+            ribbon=plv_stds,
+            fillalpha=.3,
+            legend=false,
+            xlabel="Frequency",
+            title="Phase Locking Value",
+            label="model",
+            size=(500, 500),
+            linewidth=3,
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        savefig("plv-rib.png")
+    end
+
+    function plot_feature_costs(csv_data_path)
+        # Load data
+        df_psd_data = CSV.read(csv_data_path*"/psd.csv", DataFrame)   
+        df_beta_amp_pdf_data = CSV.read(csv_data_path*"/bapdf.csv", DataFrame)
+        df_beta_dur_pdf_data = CSV.read(csv_data_path*"/bdpdf.csv", DataFrame)
+        df_plvs_data = CSV.read(csv_data_path*"/plvs.csv", DataFrame)
+
+        yPSDs = [[] for i in 1:100]
+        freq = []
+        yBAPDFS = [[] for i in 1:100]
+        xBAPDF = []
+        yBDPDFS = [[] for i in 1:100]
+        xBDPDF = []
+        yPLV = [[] for i in 1:100]
+        xPLV = []
+        for i in 1:100
+            csv_path = "data/model/"*string(i)
+
+            psd_df = CSV.read(csv_path*"/psd.csv", DataFrame)
+            freq = xPSD = psd_df[!, 1]
+            yPSDdat = psd_df[!, 2]
+            yPSDs[i]=  yPSDdat
+
+            bapdf_df = CSV.read(csv_path*"/bapdf.csv", DataFrame)
+            xBAPDF = bapdf_df[!, 1]
+            yBAPDFdat = bapdf_df[!, 2]
+            yBAPDFS[i] = yBAPDFdat
+
+            bdpdf_df = CSV.read(csv_path*"/bdpdf.csv", DataFrame)
+            xBDPDF = bdpdf_df[!, 1]
+            yBDPDFdat = bdpdf_df[!, 2]
+            yBDPDFS[i] = yBDPDFdat
+
+            plvs_df = CSV.read(csv_path*"/plvs.csv", DataFrame)
+            xPLV = plvs_df[!, 1]
+            yPLVdat = plvs_df[!, 2]
+            yPLV[i] = yPLVdat
+        end
+
+        psd_costs = []
+        for i in 1:length(yPSDs)
+            yPSDmod = yPSDs[i]
+            yPSDdat = df_psd_data[!, 2]
+            if length(yPSDmod) > length(yPSDdat)
+                yPSDmod = yPSDmod[1:length(yPSDdat)]
+            elseif length(yPSDmod) < length(yPSDdat)
+                yPSDdat = yPSDdat[1:length(yPSDmod)]
+            end
+            cost = (sum((yPSDdat .- yPSDmod).^2) / sum((yPSDdat .- mean(yPSDdat)).^2))
+            push!(psd_costs, cost)
+        end
+
+        bapdf_costs = []
+        for i in 1:length(yBAPDFS)
+            cost = (sum((df_beta_amp_pdf_data[!, 2] .- yBAPDFS[i]).^2) / sum((df_beta_amp_pdf_data[!, 2] .- mean(df_beta_amp_pdf_data[!, 2])).^2))
+            push!(bapdf_costs, cost)
+        end
+
+        bdpdf_costs = []
+        for i in 1:length(yBDPDFS)
+            cost = (sum((df_beta_dur_pdf_data[!, 2] .- yBDPDFS[i]).^2) / sum((df_beta_dur_pdf_data[!, 2] .- mean(df_beta_dur_pdf_data[!, 2])).^2))
+            push!(bdpdf_costs, cost)
+        end
+
+        plv_costs = []
+        for i in 1:length(yPLV)
+            cost = (sum((df_plvs_data[!, 2] .- yPLV[i]).^2) / sum((df_plvs_data[!, 2] .- mean(df_plvs_data[!, 2])).^2))
+            push!(plv_costs, cost)
+        end
+
+        df = DataFrame(
+            Features = ["PSD", "Beta Amplitude PDF", "Beta Duration PDF", "PLV"],
+            Costs = [mean(psd_costs), mean(bapdf_costs), mean(bdpdf_costs), mean(plv_costs)]
+        )
+        for i in 1:100
+            push!(df, ["PSD", psd_costs[i]])
+            push!(df, ["Beta Amplitude PDF", bapdf_costs[i]])
+            push!(df, ["Beta Duration PDF", bdpdf_costs[i]])
+            push!(df, ["PLV", plv_costs[i]])
+        end
+
+        @df df boxplot(:Features, :Costs, groupby=:Features)
+        savefig("feature-costs-stim.png")
+    end
+
+    function plot_feature_ribbons_stim_pair(csv_data_path)
+        # Load data
+        df_psd_data = CSV.read(csv_data_path*"/psd.csv", DataFrame)   
+        df_beta_amp_pdf_data = CSV.read(csv_data_path*"/bapdf.csv", DataFrame)
+        df_beta_dur_pdf_data = CSV.read(csv_data_path*"/bdpdf.csv", DataFrame)
+        df_plvs_data = CSV.read(csv_data_path*"/plvs.csv", DataFrame)
+
+        #A = inc-stim
+
+        yPSDs_A = [[] for i in 1:100]
+        freq_A = []
+        yBAPDFS_A = [[] for i in 1:100]
+        xBAPDF_A = []
+        yBDPDFS_A = [[] for i in 1:100]
+        xBDPDF_A = []
+        yPLV_A = [[] for i in 1:100]
+        xPLV_A = []
+        
+        for i in 1:100
+            csv_path = "data/model-inc-stim/"*string(i)
+
+            psd_df = CSV.read(csv_path*"/psd.csv", DataFrame)
+            freq_A = xPSD_A = psd_df[!, 1]
+            yPSDdat_A = psd_df[!, 2]
+            yPSDs_A[i]=  yPSDdat_A
+
+            bapdf_df = CSV.read(csv_path*"/bapdf.csv", DataFrame)
+            xBAPDF_A = bapdf_df[!, 1]
+            yBAPDFdat_A = bapdf_df[!, 2]
+            yBAPDFS_A[i] = yBAPDFdat_A
+
+            bdpdf_df = CSV.read(csv_path*"/bdpdf.csv", DataFrame)
+            xBDPDF_A = bdpdf_df[!, 1]
+            yBDPDFdat_A = bdpdf_df[!, 2]
+            yBDPDFS_A[i] = yBDPDFdat_A
+
+            plvs_df = CSV.read(csv_path*"/plvs.csv", DataFrame)
+            xPLV_A = plvs_df[!, 1]
+            yPLVdat_A = plvs_df[!, 2]
+            yPLV_A[i] = yPLVdat_A
+        end
+
+        yPSDs_B = [[] for i in 1:100]
+        freq_B = []
+        yBAPDFS_B = [[] for i in 1:100]
+        xBAPDF_B = []
+        yBDPDFS_B = [[] for i in 1:100]
+        xBDPDF_B = []
+        yPLV_B = [[] for i in 1:100]
+        xPLV_B = []
+
+        for i in 1:100
+            csv_path = "data/model-plus-stim/"*string(i)
+
+            psd_df = CSV.read(csv_path*"/psd.csv", DataFrame)
+            freq_B = xPSD_B = psd_df[!, 1]
+            yPSDdat_B = psd_df[!, 2]
+            yPSDs_B[i]=  yPSDdat_B
+
+            bapdf_df = CSV.read(csv_path*"/bapdf.csv", DataFrame)
+            xBAPDF_B = bapdf_df[!, 1]
+            yBAPDFdat_B = bapdf_df[!, 2]
+            yBAPDFS_B[i] = yBAPDFdat_B
+
+            bdpdf_df = CSV.read(csv_path*"/bdpdf.csv", DataFrame)
+            xBDPDF_B = bdpdf_df[!, 1]
+            yBDPDFdat_B = bdpdf_df[!, 2]
+            yBDPDFS_B[i] = yBDPDFdat_B
+
+            plvs_df = CSV.read(csv_path*"/plvs.csv", DataFrame)
+            xPLV_B = plvs_df[!, 1]
+            yPLVdat_B = plvs_df[!, 2]
+            yPLV_B[i] = yPLVdat_B
+        
+        end
+
+        psd_stds_A = []
+        for i in 1:length(yPSDs_A[1])
+            y = [yPSDs_A[j][i] for j in 1:100]
+            push!(psd_stds_A, std(y))
+        end
+
+        bapdf_stds_A = []
+        for i in 1:length(yBAPDFS_A[1])
+            y = [yBAPDFS_A[j][i] for j in 1:100]
+            push!(bapdf_stds_A, std(y))
+        end
+
+        bdpdf_stds_A = []
+        for i in 1:length(yBDPDFS_A[1])
+            y = [yBDPDFS_A[j][i] for j in 1:100]
+            push!(bdpdf_stds_A, std(y))
+        end
+
+        plv_stds_A = []
+        for i in 1:length(yPLV_A[1])
+            y = [yPLV_A[j][i] for j in 1:100]
+            push!(plv_stds_A, std(y))
+        end
+
+        psd_stds_B = []
+        for i in 1:length(yPSDs_B[1])
+            y = [yPSDs_B[j][i] for j in 1:100]
+            push!(psd_stds_B, std(y))
+        end
+
+        bapdf_stds_B = []
+        for i in 1:length(yBAPDFS_B[1])
+            y = [yBAPDFS_B[j][i] for j in 1:100]
+            push!(bapdf_stds_B, std(y))
+        end
+
+        bdpdf_stds_B = []
+        for i in 1:length(yBDPDFS_B[1])
+            y = [yBDPDFS_B[j][i] for j in 1:100]
+            push!(bdpdf_stds_B, std(y))
+        end
+
+        plv_stds_B = []
+        for i in 1:length(yPLV_B[1])
+            y = [yPLV_B[j][i] for j in 1:100]
+            push!(plv_stds_B, std(y))
+        end
+
+        plot(
+            df_psd_data[!, 1],
+            df_psd_data[!, 2], 
+            xlabel="Frequency (Hz)",
+            title="Power Spectral Density",
+            label="data",
+            size=(500, 500),
+            linewidth=3,
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        plot!(
+            freq_A,
+            mean(yPSDs_A, dims=1), 
+            ribbon=psd_stds_A,
+            fillalpha=.3,
+            xlabel="Frequency (Hz)",
+            title="Power Spectral Density",
+            label="stim fit",
+            size=(500, 500),
+            linewidth=3,
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        plot!(
+            freq_B,
+            mean(yPSDs_B, dims=1), 
+            ribbon=psd_stds_B,
+            fillalpha=.3,
+            xlabel="Frequency (Hz)",
+            title="Power Spectral Density",
+            label="rest fit + stim",
+            size=(500, 500),
+            linewidth=3,
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        savefig("psd-rib.png")
+
+        plot(
+            df_beta_amp_pdf_data[!, 1],
+            df_beta_amp_pdf_data[!, 2], 
+            xlabel="Amplitude",
+            title="Beta Amplitude PDF",
+            label="data",
+            size=(500, 500),
+            linewidth=3,
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        plot!(
+            xBAPDF_A,
+            mean(yBAPDFS_A, dims=1), 
+            ribbon=bapdf_stds_A,
+            fillalpha=.3,
+            xlabel="Amplitude",
+            title="Beta Amplitude PDF",
+            label="stim fit",
+            size=(500, 500),
+            linewidth=3,
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        plot!(
+            xBAPDF_B,
+            mean(yBAPDFS_B, dims=1), 
+            ribbon=bapdf_stds_B,
+            fillalpha=.3,
+            xlabel="Amplitude",
+            title="Beta Amplitude PDF",
+            label="rest fit + stim",
+            size=(500, 500),
+            linewidth=3,
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        savefig("bapdf-rib.png")
+
+        plot(
+            df_beta_dur_pdf_data[!, 1],
+            df_beta_dur_pdf_data[!, 2], 
+            xlabel="Duration",
+            title="Beta Duration PDF",
+            label="data",
+            size=(500, 500),
+            linewidth=3,
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        plot!(
+            xBDPDF_A,
+            mean(yBDPDFS_A, dims=1), 
+            ribbon=bdpdf_stds_A,
+            fillalpha=.3,
+            xlabel="Duration",
+            title="Beta Duration PDF",
+            label="stim fit",
+            size=(500, 500),
+            linewidth=3,
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        plot!(
+            xBDPDF_B,
+            mean(yBDPDFS_B, dims=1), 
+            ribbon=bdpdf_stds_B,
+            fillalpha=.3,
+            xlabel="Duration",
+            title="Beta Duration PDF",
+            label="rest fit + stim",
+            size=(500, 500),
+            linewidth=3,
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        savefig("bdpdf-rib.png")
+
+        plot(
+            df_plvs_data[!, 1],
+            df_plvs_data[!, 2], 
+            xlabel="Frequency",
+            title="Phase Locking Value",
+            label="data",
+            size=(500, 500),
+            linewidth=3,
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        plot!(
+            xPLV_A,
+            mean(yPLV_A, dims=1), 
+            ribbon=plv_stds_A,
+            fillalpha=.3,
+            xlabel="Frequency",
+            title="Phase Locking Value",
+            label="stim fit",
+            size=(500, 500),
+            linewidth=3,
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        plot!(
+            xPLV_B,
+            mean(yPLV_B, dims=1), 
+            ribbon=plv_stds_B,
+            fillalpha=.3,
+            xlabel="Frequency",
+            title="Phase Locking Value",
+            label="rest fit + stim",
+            size=(500, 500),
+            linewidth=3,
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        savefig("plv-rib.png")
+
+    end
+
+    function plot_feature_costs_stim_pair(csv_data_path)
+        # Load data
+        df_psd_data = CSV.read(csv_data_path*"/psd.csv", DataFrame)   
+        df_beta_amp_pdf_data = CSV.read(csv_data_path*"/bapdf.csv", DataFrame)
+        df_beta_dur_pdf_data = CSV.read(csv_data_path*"/bdpdf.csv", DataFrame)
+        df_plvs_data = CSV.read(csv_data_path*"/plvs.csv", DataFrame)
+
+        #A = inc-stim
+
+        yPSDs_A = [[] for i in 1:100]
+        freq_A = []
+        yBAPDFS_A = [[] for i in 1:100]
+        xBAPDF_A = []
+        yBDPDFS_A = [[] for i in 1:100]
+        xBDPDF_A = []
+        yPLV_A = [[] for i in 1:100]
+        xPLV_A = []
+        
+        for i in 1:100
+            csv_path = "data/model-inc-stim/"*string(i)
+
+            psd_df = CSV.read(csv_path*"/psd.csv", DataFrame)
+            freq_A = psd_df[!, 1]
+            yPSDdat_A = psd_df[!, 2]
+            yPSDs_A[i]=  yPSDdat_A
+
+            bapdf_df = CSV.read(csv_path*"/bapdf.csv", DataFrame)
+            xBAPDF_A = bapdf_df[!, 1]
+            yBAPDFdat_A = bapdf_df[!, 2]
+            yBAPDFS_A[i] = yBAPDFdat_A
+
+            bdpdf_df = CSV.read(csv_path*"/bdpdf.csv", DataFrame)
+            xBDPDF_A = bdpdf_df[!, 1]
+            yBDPDFdat_A = bdpdf_df[!, 2]
+            yBDPDFS_A[i] = yBDPDFdat_A
+
+            plvs_df = CSV.read(csv_path*"/plvs.csv", DataFrame)
+            xPLV_A = plvs_df[!, 1]
+            yPLVdat_A = plvs_df[!, 2]
+            yPLV_A[i] = yPLVdat_A
+        end
+
+        yPSDs_B = [[] for i in 1:100]
+        freq_B = []
+        yBAPDFS_B = [[] for i in 1:100]
+        xBAPDF_B = []
+        yBDPDFS_B = [[] for i in 1:100]
+        xBDPDF_B = []
+        yPLV_B = [[] for i in 1:100]
+        xPLV_B = []
+
+        for i in 1:100
+            csv_path = "data/model-plus-stim/"*string(i)
+
+            psd_df = CSV.read(csv_path*"/psd.csv", DataFrame)
+            freq_B =  psd_df[!, 1]
+            yPSDdat_B = psd_df[!, 2]
+            yPSDs_B[i]=  yPSDdat_B
+
+            bapdf_df = CSV.read(csv_path*"/bapdf.csv", DataFrame)
+            xBAPDF_B = bapdf_df[!, 1]
+            yBAPDFdat_B = bapdf_df[!, 2]
+            yBAPDFS_B[i] = yBAPDFdat_B
+
+            bdpdf_df = CSV.read(csv_path*"/bdpdf.csv", DataFrame)
+            xBDPDF_B = bdpdf_df[!, 1]
+            yBDPDFdat_B = bdpdf_df[!, 2]
+            yBDPDFS_B[i] = yBDPDFdat_B
+
+            plvs_df = CSV.read(csv_path*"/plvs.csv", DataFrame)
+            xPLV_B = plvs_df[!, 1]
+            yPLVdat_B = plvs_df[!, 2]
+            yPLV_B[i] = yPLVdat_B
+        
+        end
+
+        psd_costs_A = []
+        for i in 1:length(yPSDs_A)
+            yPSDmod = yPSDs_A[i]
+            yPSDdat = df_psd_data[!, 2]
+            if length(yPSDmod) > length(yPSDdat)
+                yPSDmod = yPSDmod[1:length(yPSDdat)]
+            elseif length(yPSDmod) < length(yPSDdat)
+                yPSDdat = yPSDdat[1:length(yPSDmod)]
+            end
+            cost = (sum((yPSDdat .- yPSDmod).^2) / sum((yPSDdat .- mean(yPSDdat)).^2))
+            push!(psd_costs_A, cost)
+        end
+
+        bapdf_costs_A = []
+        for i in 1:length(yBAPDFS_A)
+            cost = (sum((df_beta_amp_pdf_data[!, 2] .- yBAPDFS_A[i]).^2) / sum((df_beta_amp_pdf_data[!, 2] .- mean(df_beta_amp_pdf_data[!, 2])).^2))
+            push!(bapdf_costs_A, cost)
+        end
+
+        bdpdf_costs_A = []
+        for i in 1:length(yBDPDFS_A)
+            cost = (sum((df_beta_dur_pdf_data[!, 2] .- yBDPDFS_A[i]).^2) / sum((df_beta_dur_pdf_data[!, 2] .- mean(df_beta_dur_pdf_data[!, 2])).^2))
+            push!(bdpdf_costs_A, cost)
+        end
+
+        plv_costs_A = []
+        for i in 1:length(yPLV_A)
+            cost = (sum((df_plvs_data[!, 2] .- yPLV_A[i]).^2) / sum((df_plvs_data[!, 2] .- mean(df_plvs_data[!, 2])).^2))
+            push!(plv_costs_A, cost)
+        end
+
+        psd_costs_B = []
+        for i in 1:length(yPSDs_B)
+            yPSDmod = yPSDs_B[i]
+            yPSDdat = df_psd_data[!, 2]
+            if length(yPSDmod) > length(yPSDdat)
+                yPSDmod = yPSDmod[1:length(yPSDdat)]
+            elseif length(yPSDmod) < length(yPSDdat)
+                yPSDdat = yPSDdat[1:length(yPSDmod)]
+            end
+            cost = (sum((yPSDdat .- yPSDmod).^2) / sum((yPSDdat .- mean(yPSDdat)).^2))
+            push!(psd_costs_B, cost)
+        end
+
+        bapdf_costs_B = []
+        for i in 1:length(yBAPDFS_B)
+            cost = (sum((df_beta_amp_pdf_data[!, 2] .- yBAPDFS_B[i]).^2) / sum((df_beta_amp_pdf_data[!, 2] .- mean(df_beta_amp_pdf_data[!, 2])).^2))
+            push!(bapdf_costs_B, cost)
+        end
+
+        bdpdf_costs_B = []
+        for i in 1:length(yBDPDFS_B)
+            cost = (sum((df_beta_dur_pdf_data[!, 2] .- yBDPDFS_B[i]).^2) / sum((df_beta_dur_pdf_data[!, 2] .- mean(df_beta_dur_pdf_data[!, 2])).^2))
+            push!(bdpdf_costs_B, cost)
+        end
+
+        plv_costs_B = []
+        for i in 1:length(yPLV_B)
+            cost = (sum((df_plvs_data[!, 2] .- yPLV_B[i]).^2) / sum((df_plvs_data[!, 2] .- mean(df_plvs_data[!, 2])).^2))
+            push!(plv_costs_B, cost)
+        end
+
+        dfd = DataFrame(
+            Features = ["PSD",],
+            Fit = ["stim fit"],
+            Costs = [mean(psd_costs_A)]
+        )
+        for i in 1:100
+            push!(dfd, ["PSD", "stim fit", psd_costs_A[i]])
+            push!(dfd, ["PSD", "rest fit + stim", psd_costs_B[i]])
+            push!(dfd, ["Amp. PDF", "stim fit", bapdf_costs_A[i]])
+            push!(dfd, ["Amp. PDF", "rest fit + stim", bapdf_costs_B[i]])
+            push!(dfd, ["Dur. PDF", "stim fit", bdpdf_costs_A[i]])
+            push!(dfd, ["Dur. PDF", "rest fit + stim", bdpdf_costs_B[i]])
+            push!(dfd, ["PLV", "stim fit", plv_costs_A[i]])
+            push!(dfd, ["PLV", "rest fit + stim", plv_costs_B[i]])
+        end
+
+       stds = [ 
+        std(bapdf_costs_B),
+        std(bapdf_costs_A), 
+        std(bdpdf_costs_B),
+        std(bdpdf_costs_A),
+        std(plv_costs_B),
+        std(plv_costs_A),
+        std(psd_costs_B),
+        std(psd_costs_A)
+       ]
+
+
+        @df dfd groupedboxplot(
+            :Features, 
+            :Costs, 
+            group=:Fit,
+             xlabel="Feature", 
+             ylabel="Cost", 
+             title="Feature Costs", 
+             legend=:topleft, 
+             size=(500, 500), 
+             xtickfont=12, 
+             ytickfont=12, 
+             titlefont=12, 
+             guidefont=12, 
+             tickfont=12, 
+             legendfont=12, 
+             margin=2.5mm
+             )
+        savefig("feature-costs-stim.png")
+
+    end
+
 end
 
 #analysis.analyse_all_flat()
 #analysis.get_raw("P20", "15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1", 2001, 3000)
 #analysis.get_beta_burst_process("P20", "15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1")
 #analysis.plot_example_bursts()
+
+#analysis.plot_feature_ribbons("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1")
+#analysis.plot_feature_costs("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1")
+#analysis.plot_feature_ribbons_stim_pair("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=180_STIM_EC_v1")
+analysis.plot_feature_costs_stim_pair("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=180_STIM_EC_v1")

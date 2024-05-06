@@ -184,11 +184,11 @@ function cost_bb(params)
     w_IE = Float32(params[4])
     beta = Float32(params[5])
     noise_dev = Float32(params[6])
-    stim_mag = Float32(params[7])
-    theta_E_A_param = Float32(params[8])
-    theta_I_A_param = Float32(params[9])
-    theta_E_B_param = Float32(params[8])
-    theta_I_B_param = Float32(params[9])
+    stim_mag = Float32(0.0)
+    theta_E_A_param = Float32(params[7])
+    theta_I_A_param = Float32(params[8])
+    theta_E_B_param = Float32(params[7])
+    theta_I_B_param = Float32(params[8])
 
     model = create_benoit_model(N, W, etta, tau_E, tau_I, w_EE, w_EI, w_IE, beta, noise_dev, stim_mag)
     
@@ -296,8 +296,8 @@ function init_param(bounds, P, name, NPARAMS=2500)
     yPSDdat = psd_df[!, 2]
     peakDat = argmax(yPSDdat)
 
-    #csv_df_w = DataFrame(tau=[0.0], w_EE=[0.0], w_EI=[0.0], w_IE=[0.0], beta=[0.0], noise=[0.0], theta_E=[0.0], theta_I=[0.0])
-    #CSV.write(csv_path*"/params.csv", csv_df_w)
+    csv_df_w = DataFrame(tau=[0.0], w_EE=[0.0], w_EI=[0.0], w_IE=[0.0], beta=[0.0], noise=[0.0], theta_E=[0.0], theta_I=[0.0])
+    CSV.write(csv_path*"/params.csv", csv_df_w)
 
     count = 0
     while count < NPARAMS
@@ -319,14 +319,6 @@ function init_param(bounds, P, name, NPARAMS=2500)
         range_t = 0.0:dt:T
         theta_E = [theta_E_A_p, theta_E_A_p]
         theta_I = [theta_I_A_p, theta_I_A_p]
-
-        stimBlock = create_stim_block(100.0, 100, 100, 10, 1)
-        SR = 1000.0
-        gamma_param = 0.1 # or 0.05
-        OT_suppress = 0.3
-        target_phase = pi / 2.0
-        target_freq = 10.0
-        oscilltracker = Oscilltracker(target_freq, target_phase, SR, OT_suppress, gamma_param)
 
         df = run_act_time(model, simulate_benoit_model, range_t, dt, theta_E, theta_I, oscilltracker, stimBlock)
 
@@ -673,8 +665,7 @@ function O(P, name, mode)
             (0.0, 10.0),
             (0.0, 10.0),
             (0.0, 10.0),
-            (0.0, 0.3),
-            (0.0, 0.5),
+            (0.0, 0.1),
             (-2.0, 10.0),
             (-10.0, 2.0)
         ]
@@ -683,7 +674,7 @@ function O(P, name, mode)
     elseif mode == "bp"
         opt_param(P, name, 1)
     elseif mode == "opt"
-        good_guess = [0.0167907, 1.84502, 8.10264, 4.90234, 3.76054, 0.0673752, 0.001, 0.275149, -2.27837]
+        good_guess = [0.016014188528060913,7.517777919769287,6.087207317352295,6.908730983734131,0.7650350332260132,0.05992060899734497,1.3291213512420654,-0.9028921127319336]
         res = bboptimize(cost_bb, good_guess; SearchRange=p_bounds)
         filename="./jobs-out/"*P*"-"*name*".txt"
 
