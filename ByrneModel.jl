@@ -20,7 +20,7 @@ module ByrneModel
         tau::Float32
         ex::Float32
         kv::Float32
-        gamma::Float32 # Hetereogeneity parameter
+        gamma::Float32             # Hetereogeneity parameter
     end
 
     struct Node
@@ -30,7 +30,7 @@ module ByrneModel
         ks_EI::Float32
         ks_IE::Float32
         ks_II::Float32
-        kv_EI::Float32  #Two-way gap junction
+        kv_EI::Float32             #Two-way gap junction
         alpha_EE::Float32
         alpha_EI::Float32
         alpha_IE::Float32
@@ -159,7 +159,7 @@ module ByrneModel
                 
                 C = 0.0
                 for (k, _) in enumerate(N.nodes)
-                    C += N.W[k,j] * R[k].rR_E[i-1]
+                    C += N.W[k,j] * R[k].rR_V[i-1]##
                 end
                 C = N.etta * C / length(N.nodes)
 
@@ -182,7 +182,7 @@ module ByrneModel
 
                 R[j].rR_E[i] = R[j].rR_E[i-1] + drR_E
                 R[j].rR_I[i] = R[j].rR_I[i-1] + drR_I
-                R[j].rV_E[i] = R[j].rV_E[i-1] + drV_E + N.noise_dev * (n.WE[i] - n.WE[i - 1])
+                R[j].rV_E[i] = R[j].rV_E[i-1] + drV_E + N.noise_dev * (n.WE[i] - n.WE[i - 1]) + C##
                 R[j].rV_I[i] = R[j].rV_I[i-1] + drV_I + N.noise_dev * (n.WI[i] - n.WI[i - 1])
 
                 R[j].rZ_E[i] = abs(get_kuramoto_parameter(R[j].rR_E[i], R[j].rV_E[i], n.E.tau))

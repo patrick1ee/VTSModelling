@@ -7,7 +7,7 @@ include("./Stimulation.jl")
 using BlackBoxOptim, CSV, DataFrames, Distributions, DSP, FFTW, KernelDensity, KissSmoothing, Optimization, OptimizationCMAEvolutionStrategy, Plots, Statistics
 
 using .BenoitModel: create_benoit_model, create_benoit_node, create_benoit_network, simulate_benoit_model
-using .ByrneModel: create_byrne_pop, create_byrne_pop_EI, create_byrne_network, create_if_pop, simulate_if_pop, simulate_byrne_EI_network
+using .ByrneModel: create_byrne_pop, create_byrne_pop_EI, create_byrne_network, create_byrne_node, create_if_pop, simulate_if_pop, simulate_byrne_EI_network
 using .Signal: get_beta_data, get_pow_spec, get_hilbert_amplitude_pdf, get_burst_profiles, get_plv_freq
 using .Stimulation: create_stim_block
 
@@ -49,8 +49,10 @@ function run_byrne_net(N, simulate, range_t, T, dt, theta_E, theta_I, stim)
 end
 
 function cost_bb_bc(params)
-    csv_path = "data/P7/06_02_2024_P7_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1"
-    SR = 1000
+    P= ARGS[1]
+    name = ARGS[2]
+    
+    csv_path = "data/"*P*"/"*name
 
     psd_df = CSV.read(csv_path*"/psd.csv", DataFrame)
     xPSD = psd_df[!, 1]
@@ -66,50 +68,84 @@ function cost_bb_bc(params)
     W=[Float32(0.0) Float32(1.0); Float32(1.0) Float32(0.0)]
     etta=Float32(0.5)
 
-    tau_p = Float32(params[1])
-    ex_p = Float32(params[2])
-    ks_p = Float32(params[3])
-    kv_p = Float32(params[4])
-    gamma_p = Float32(params[5])
-    alpha_p = Float32(params[6])
-    theta_E_p = Float32(params[7])
-    theta_I_p = Float32(params[8])
+    tau = Float32(params[1])
+    ex_E = Float32(params[2])
+    ex_I = Float32(params[3])
+    kv_E = Float32(params[4])
+    kv_I = Float32(params[5])
+    
+    ks_EE = Float32(params[6])
+    ks_EI = Float32(params[7]) 
+    ks_IE = Float32(params[8])
+    ks_II = Float32(0.0)
+    kv_EI = Float32(params[9])
 
-    E = create_byrne_pop_EI(ex_p, gamma_p, tau_p)
-    I = create_byrne_pop_EI(ex_p, gamma_p, tau_p)
-    net = create_byrne_network(N, W, etta, E, I, ks_p, kv_p, alpha_p)
+    alpha_EE = Float32(params[10])
+    alpha_EI = Float32(params[11])
+    alpha_IE = Float32(params[11])
+    alpha_II = Float32(0.5)
+    #gamma = Float32(params[10])
+    #noise_dev = Float32(params[11])
+
+    #ks_EE = Float32(10.0)
+    #ks_EI = Float32(15.0)
+    #ks_IE = Float32(-10.0)
+    #ks_II = Float32(-25.0)
+    #kv_EI = Float32(0.1)
+    #alpha_EE = Float32(0.5)
+    #alpha_EI = Float32(0.5)
+    #alpha_IE = Float32(0.5)
+    #alpha_II = Float32(0.5)
+    gamma = Float32(0.5)
+    noise_dev = Float32(params[12])
+
+    thE_A = Float32(0.0)
+    thI_A = Float32(0.0)
+
+    vth = 1.000
+    vr = -1.000
+
+    #p = create_byrne_pop(ex, ks, kv, gamma, tau, alpha)
+    #p = create_if_pop(1000, ex, ks, kv, gamma, tau, alpha, vth, vr)
+    E = create_byrne_pop_EI(tau, ex_E, kv_E, gamma)
+    I = create_byrne_pop_EI(tau, ex_I, kv_I, gamma)
+    N1 = create_byrne_node(E, I, ks_EE, ks_EI, ks_IE, ks_II, kv_EI, alpha_EE, alpha_EI, alpha_IE, alpha_II, noise_dev)
+    N2 = create_byrne_node(E, I, ks_EE, ks_EI, ks_IE, ks_II, kv_EI, alpha_EE, alpha_EI, alpha_IE, alpha_II, noise_dev)
+    model = create_byrne_network([N1, N2], W, etta, noise_dev)
     
     #timescale now ms
     T = 100000.0
-    dt = 1.0  
+    dt = 1.0 
     range_t = 0.0:dt:T
-        
-    response = fill(0.0, length(range_t)) 
-    #for i in 1:6:T-6
-    #    #Start pulse
-    #    for j in 0:24
-    #        for k in 0:2:10
-    #            response[Int64(trunc(i*1000+j*200+k*(1000/130)))] = 0.001684
-    #        end
-    #    end
-    #end
-    theta_E = [theta_E_p, theta_E_p]
-    theta_I = [theta_I_p, theta_I_p]
-    stim = response
-    df= run_byrne_net(net, simulate_byrne_EI_network, range_t, T, dt, theta_E, theta_I, [])
-    #zscore
-    Eproc = df.R[1].rV_E 
-    Eproc = Eproc .- mean(Eproc) / std(Eproc)
-    Eproc_alt = df.R[2].rV_E
-    Eproc_alt = Eproc_alt .- mean(Eproc_alt) / std(Eproc_alt)
+    
+    theta_E = [thE_A, thE_A]
+    theta_I = [thI_A, thI_A]
+    #df = run_byrne_single(p, simulate_byrne_pop, range_t, dt)
+    #df = run_byrne_if(p, simulate_if_pop, range_t, dt)
+    df= run_byrne_net(model, simulate_byrne_EI_network, range_t, T, dt, theta_E, theta_I, [])
 
-    Ebeta = df.R[1].rV_E
+    #timescale now ms
+
+    #plot_byrne_single(df)
+    
+    #zscore
+    cut_model_signal = df.R[1].rV_E[1:end]
+    cut_model_alt_signal = df.R[2].rV_E[1:end]
+    raw_model_signal = (cut_model_signal .- mean(cut_model_signal)) ./ std(cut_model_signal)
+    raw_model_alt_signal = (cut_model_alt_signal .- mean(cut_model_alt_signal)) ./ std(cut_model_alt_signal)
+
+    Eproc = raw_model_signal
+    Eproc_alt = raw_model_alt_signal
+    Ebeta = get_beta_data(df.R[1].rV_E)
     Ebeta = Ebeta .- mean(Ebeta) / std(Ebeta)
 
     freq, yPSDmod = get_pow_spec(Eproc, xPSD, SR)
-    _, yBAPDFmod, Ebeta_ha = get_hilbert_amplitude_pdf(Ebeta)
-    _, yBDPDFmod, _ = get_burst_durations(Ebeta_ha)
-    yPLVmod = get_plv_freq(Eproc, Eproc_alt)
+
+    _, _, ha = get_hilbert_amplitude_pdf(Ebeta)
+    S, N = denoise(convert(AbstractArray{Float64}, ha))
+    xBAPDFmod, yBAPDFmod, aBDPDF, yBDPDFmod, _, _ = get_burst_profiles(S)
+
+    xPLVmod, yPLVmod = get_plv_freq(Eproc, Eproc_alt)
 
     if length(yPSDmod) > length(yPSDdat)
         yPSDmod = yPSDmod[1:length(yPSDdat)]
@@ -118,29 +154,28 @@ function cost_bb_bc(params)
     end
     
     coeffs = [1.0, 1.0, 1.0, 1.0]
-    cost1 = 1.0
-    cost2 = 1.0
-    cost3 = 1.0
-    cost4 = 1.0
+    cost1 = 2.0
+    cost2 = 2.0
+    cost3 = 2.0
+    cost4 = 2.0
 
-    cost1 = (sum((yPSDdat .- yPSDmod).^2) / sum((yPSDdat .- mean(yPSDdat)).^2)) / 4
-
+    cost1 = (sum((yPSDdat .- yPSDmod).^2) / sum((yPSDdat .- mean(yPSDdat)).^2))
     if length(yBAPDFmod) > 0
-        cost2 = (sum((yBAPDFdat .- yBAPDFmod).^2) / sum((yBAPDFdat .- mean(yBAPDFdat)).^2)) / 4
+        cost2 = (sum((yBAPDFdat .- yBAPDFmod).^2) / sum((yBAPDFdat .- mean(yBAPDFdat)).^2))
     end
     if length(yBDPDFmod) > 0
-        cost3 = (sum((yBDPDFdat .- yBDPDFmod).^2) / sum((yBDPDFdat .- mean(yBDPDFdat)).^2)) / 4
+        cost3 = (sum((yBDPDFdat .- yBDPDFmod).^2) / sum((yBDPDFdat .- mean(yBDPDFdat)).^2))
     end
-
-    cost4 = (sum((yPLVdat .- yPLVmod).^2) / sum((yPLVdat .- mean(yPLVdat)).^2)) / 4
+    cost4 = (sum((yPLVdat .- yPLVmod).^2) / sum((yPLVdat .- mean(yPLVdat)).^2))
 
     cost = coeffs[1]*cost1 + coeffs[2]*cost2 + coeffs[3]*cost3 + coeffs[4]*cost4
+    cost = cost / 4.0
 
-    filename="costs.txt"
+    filename="./jobs-out/costs-"*name*".txt"
 
     if isfile(filename)
         fileID = open(filename, "w")
-        println(fileID, tau_p, ", ", ex_p, ", ", ks_p, ", ", kv_p, ", ", gamma_p, ", ", alpha_p, ", ", theta_E_p, ", ", theta_I_p, "::", cost1, "::", cost2, "::", cost3, "::", cost4, "\n")
+        println(fileID, "::", tau_E, "::", tau_I, "::", w_EE, "::", w_EI, "::", w_IE, "::", beta, "::", cost1, "::", cost2, "::", cost3, "::", cost4, "\n")
         close(fileID)
     end
 
@@ -661,13 +696,13 @@ end
 function O(P, name, mode)
     p_bounds=[
             (0.016, 0.017),
-            (0.0, 10.0),
-            (0.0, 10.0),
+            (0.0, 2.0),
+            (0.0, 2.0),
             (0.0, 10.0),
             (0.0, 10.0),
             (0.0, 0.1),
             (-2.0, 10.0),
-            (-10.0, 2.0)
+            (-10.0, 2.0),
         ]
     if mode == "init"
         init_param(p_bounds, P, name, 100)
@@ -681,11 +716,50 @@ function O(P, name, mode)
         fileID = open(filename, "w")
         println(fileID, best_candidate(res))
         close(fileID)
+    elseif mode == "opt-bc"
+        #=
+        tau = Float32(32.0)
+        ex_E = Float32(1.0)
+        ex_I = Float32(0.0)
+        kv_E = Float32(1.0)
+        kv_I = Float32(1.0)
+        
+        ks_EE = Float32(10.0)
+        ks_EI = Float32(15.0)
+        ks_IE = Float32(-10.0)
+        ks_II = Float32(-25.0)
+        kv_EI = Float32(0.1)
+        alpha_EE = Float32(0.5)
+        alpha_EI = Float32(0.5)
+        alpha_IE = Float32(0.5)
+        alpha_II = Float32(0.5)
+        gamma = Float32(0.5)
+        noise_dev = Float32(0.1)=#
+        p_bounds_bc = [
+            (30.0, 36.0),
+            (0.0, 2.0),
+            (-2.0, 0.0),
+            (0.1, 1.0),
+            (0.0, 1.0),
+            (0.0, 5.0),
+            (-5.0, 0.0),
+            (0.0, 5.0),
+            (0.0, 0.5),
+            (0.0, 0.5),
+            (0.0, 0.5),
+            (0.0, 0.3)
+        ]
+        res = bboptimize(cost_bb_bc; SearchRange=p_bounds_bc)
+        filename="./jobs-out/"*P*"-"*name*".txt"
+
+        fileID = open(filename, "w")
+        println(fileID, best_candidate(res))
+        close(fileID)
     end
 end
 
  function main(args)
-    O(args[1], args[2], "opt")
+    O(args[1], args[2], "opt-bc")
  end
 
  #O("P4", "05_02_2024_P4_Ch14_FRQ=11Hz_FULL_CL_phase=0_REST_EC_v1", "opt")

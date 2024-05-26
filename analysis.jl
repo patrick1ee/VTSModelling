@@ -217,13 +217,14 @@ module analysis
 
         csv_df = DataFrame(x=ax,y=ay)
         CSV.write(csv_path*"/bapdf.csv", csv_df)
-        plot(ax, ay, xlabel="amplitude", ylim=(0.0, 2.0), xlim=(0, 6), xticks=0:2:6, yticks=0:0.5:2.0, size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
+        plot(ax, ay, xlabel="amplitude", title="Beta Burst Amplitude PDF", c=2, ylim=(0.0, 2.0), xlim=(0, 6), xticks=0:2:6, yticks=0:0.5:2.0, size=(500,500), linewidth=3, xtickfont=12, ytickfont=12, legend=false, titlefont=12, guidefont=12, tickfont=12, legendfont=12)
         savefig(plot_path*"/bapdf.png")
 
         csv_df = DataFrame(x=dx,y=dy)
         CSV.write(csv_path*"/bdpdf.csv", csv_df)
         plot(dx, dy, xlabel="duration", size=(500,500), linewidth=3, xtickfont=16, ytickfont=16, legend=false, titlefont=16, guidefont=16, tickfont=16, legendfont=16)
         savefig(plot_path*"/bdpdf.png")
+
     end
 
     function run_plv(s1, s2, plot_path, csv_path)
@@ -258,8 +259,10 @@ module analysis
         csv_df = DataFrame(Frequency = freqs, PLV = S)
         CSV.write(csv_path*"/plvs.csv", csv_df)
 
-        plot(freqs, plvs)
+        plot(freqs, plvs, c=2, size=(500,500), linewidth=3, xtickfont=12, ytickfont=12, ylabel="PLV", title="Phase-locking Value", xlabel="Frequency (Hz)", legend=false, titlefont=12, guidefont=12, tickfont=12, legendfont=12)
         savefig(plot_path*"/plvs.png")
+
+        #println("Max PLV: "*string(maximum(plvs))*", Min PLV: "*string(minimum(plvs)))
     end
 
     function parse_eeg_data(data, CONST_REF_CHAN)
@@ -658,50 +661,72 @@ module analysis
         yPLV = [[] for i in 1:100]
         xPLV = []
         for i in 1:100
-            csv_path = "data/model/"*string(i)
+            csv_path = "data/model-bc-rest-100/"*string(i)
 
             psd_df = CSV.read(csv_path*"/psd.csv", DataFrame)
             freq = xPSD = psd_df[!, 1]
             yPSDdat = psd_df[!, 2]
-            yPSDs[i]=  yPSDdat
+            if any(isnan.(yPSDdat)) 
+                continue
+            end
 
             bapdf_df = CSV.read(csv_path*"/bapdf.csv", DataFrame)
             xBAPDF = bapdf_df[!, 1]
             yBAPDFdat = bapdf_df[!, 2]
-            yBAPDFS[i] = yBAPDFdat
+            if any(isnan.(yBAPDFdat )) 
+                continue
+            end
 
             bdpdf_df = CSV.read(csv_path*"/bdpdf.csv", DataFrame)
             xBDPDF = bdpdf_df[!, 1]
             yBDPDFdat = bdpdf_df[!, 2]
-            yBDPDFS[i] = yBDPDFdat
+            if any(isnan.(yBDPDFdat)) 
+                continue
+            end
 
             plvs_df = CSV.read(csv_path*"/plvs.csv", DataFrame)
             xPLV = plvs_df[!, 1]
             yPLVdat = plvs_df[!, 2]
+            if any(isnan.(yPLVdat)) 
+                continue
+            end
+
+            yPSDs[i]=  yPSDdat
+            yBAPDFS[i] = yBAPDFdat
+            yBDPDFS[i] = yBDPDFdat
             yPLV[i] = yPLVdat
         end
 
+        yPSDs = [y for y in yPSDs if length(y) > 0]
+        yBAPDFS = [y for y in yBAPDFS if length(y) > 0]
+        yBDPDFS = [y for y in yBDPDFS if length(y) > 0]
+        yPLV = [y for y in yPLV if length(y) > 0]
+
+        La = length(yPSDs)
+
+        print(size(yPSDs))
+
         psd_stds = []
         for i in 1:length(yPSDs[1])
-            y = [yPSDs[j][i] for j in 1:100]
+            y = [yPSDs[j][i] for j in 1:La]
             push!(psd_stds, std(y))
         end
 
         bapdf_stds = []
         for i in 1:length(yBAPDFS[1])
-            y = [yBAPDFS[j][i] for j in 1:100]
+            y = [yBAPDFS[j][i] for j in 1:La]
             push!(bapdf_stds, std(y))
         end
 
         bdpdf_stds = []
         for i in 1:length(yBDPDFS[1])
-            y = [yBDPDFS[j][i] for j in 1:100]
+            y = [yBDPDFS[j][i] for j in 1:La]
             push!(bdpdf_stds, std(y))
         end
 
         plv_stds = []
         for i in 1:length(yPLV[1])
-            y = [yPLV[j][i] for j in 1:100]
+            y = [yPLV[j][i] for j in 1:La]
             push!(plv_stds, std(y))
         end
 
@@ -729,6 +754,7 @@ module analysis
             xlabel="Frequency (Hz)",
             title="Power Spectral Density",
             label="model",
+            c=3,
             size=(500, 500),
             linewidth=3,
             xtickfont=12,
@@ -765,6 +791,7 @@ module analysis
             xlabel="Amplitude",
             title="Beta Amplitude PDF",
             label="model",
+            c=3,
             size=(500, 500),
             linewidth=3,
             xtickfont=12,
@@ -801,6 +828,7 @@ module analysis
             xlabel="Duration",
             title="Beta Duration PDF",
             label="model",
+            c=3,
             size=(500, 500),
             linewidth=3,
             xtickfont=12,
@@ -838,6 +866,7 @@ module analysis
             xlabel="Frequency",
             title="Phase Locking Value",
             label="model",
+            c=3,
             size=(500, 500),
             linewidth=3,
             xtickfont=12,
@@ -932,8 +961,8 @@ module analysis
             push!(df, ["PLV", plv_costs[i]])
         end
 
-        @df df boxplot(:Features, :Costs, groupby=:Features)
-        savefig("feature-costs-stim.png")
+        @df df boxplot(:Features, :Costs, groupby=:Features, legend=false)
+        savefig("feature-costs-2.png")
     end
 
     function plot_feature_ribbons_stim_pair(csv_data_path)
@@ -1285,7 +1314,7 @@ module analysis
         df_beta_dur_pdf_data = CSV.read(csv_data_path*"/bdpdf.csv", DataFrame)
         df_plvs_data = CSV.read(csv_data_path*"/plvs.csv", DataFrame)
 
-        #A = inc-stim
+        #A = more noise
 
         yPSDs_A = [[] for i in 1:100]
         freq_A = []
@@ -1297,7 +1326,7 @@ module analysis
         xPLV_A = []
         
         for i in 1:100
-            csv_path = "data/model-inc-stim/"*string(i)
+            csv_path = "data/model/"*string(i)
 
             psd_df = CSV.read(csv_path*"/psd.csv", DataFrame)
             freq_A = psd_df[!, 1]
@@ -1330,7 +1359,7 @@ module analysis
         xPLV_B = []
 
         for i in 1:100
-            csv_path = "data/model-plus-stim/"*string(i)
+            csv_path = "data/model-less-noise/"*string(i)
 
             psd_df = CSV.read(csv_path*"/psd.csv", DataFrame)
             freq_B =  psd_df[!, 1]
@@ -1385,6 +1414,8 @@ module analysis
             push!(plv_costs_A, cost)
         end
 
+        total_costs_A = (psd_costs_A .+ bapdf_costs_A .+ bdpdf_costs_A .+ plv_costs_A) ./4
+
         psd_costs_B = []
         for i in 1:length(yPSDs_B)
             yPSDmod = yPSDs_B[i]
@@ -1416,7 +1447,9 @@ module analysis
             push!(plv_costs_B, cost)
         end
 
-        dfd = DataFrame(
+        total_costs_B = (psd_costs_B .+ bapdf_costs_B .+ bdpdf_costs_B .+ plv_costs_B) ./4
+
+        #=dfd = DataFrame(
             Features = ["PSD",],
             Fit = ["stim fit"],
             Costs = [mean(psd_costs_A)]
@@ -1441,17 +1474,29 @@ module analysis
         std(plv_costs_A),
         std(psd_costs_B),
         std(psd_costs_A)
-       ]
+       ]=#
+
+       dfn = DataFrame(
+          Noise=["0 < Ѯ < 0.3", "0 < Ѯ < 0.05"],
+          Costs=[mean(total_costs_A), mean(total_costs_B)]
+       )
+
+       print(mean(total_costs_A))
+         print(mean(total_costs_B))
+
+       for i in 1:100
+           push!(dfn, ["0 < Ѯ < 0.3", total_costs_A[i]])
+           push!(dfn, ["0 < Ѯ < 0.05", total_costs_B[i]])
+       end
 
 
-        @df dfd groupedboxplot(
-            :Features, 
+        @df dfn groupedboxplot(
+            :Noise, 
             :Costs, 
-            group=:Fit,
-             xlabel="Feature", 
+             groupby=:Costs,
              ylabel="Cost", 
-             title="Feature Costs", 
-             legend=:topleft, 
+             title="Effect of Noise on Fit Cost & Stability", 
+             legend=false, 
              size=(500, 500), 
              xtickfont=12, 
              ytickfont=12, 
@@ -1461,11 +1506,1094 @@ module analysis
              legendfont=12, 
              margin=2.5mm
              )
-        savefig("feature-costs-stim.png")
+        savefig("feature-costs-noise.png")
 
     end
 
+    function plot_data_features_data_stimeffect(csv_data_path, csv_data_path_stim)
+        # Load data
+        df_psd_data = CSV.read(csv_data_path*"/psd.csv", DataFrame)   
+        df_beta_amp_pdf_data = CSV.read(csv_data_path*"/bapdf.csv", DataFrame)
+        df_beta_dur_pdf_data = CSV.read(csv_data_path*"/bdpdf.csv", DataFrame)
+        df_plvs_data = CSV.read(csv_data_path*"/plvs.csv", DataFrame)
+
+        df_psd_data_stim = CSV.read(csv_data_path_stim*"/psd.csv", DataFrame)
+        df_beta_amp_pdf_data_stim = CSV.read(csv_data_path_stim*"/bapdf.csv", DataFrame)
+        df_beta_dur_pdf_data_stim = CSV.read(csv_data_path_stim*"/bdpdf.csv", DataFrame)
+        df_plvs_data_stim = CSV.read(csv_data_path_stim*"/plvs.csv", DataFrame)
+
+        plot(
+            df_psd_data[!, 1],
+            df_psd_data[!, 2], 
+            xlabel="Frequency (Hz)",
+            title="Power Spectral Density",
+            label="rest",
+            size=(500, 500),
+            linewidth=3,
+            linestyle=:dot,
+            c="black",
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        plot!(
+            df_psd_data_stim[!, 1],
+            df_psd_data_stim[!, 2], 
+            xlabel="Frequency (Hz)",
+            title="Power Spectral Density",
+            label="stim",
+            size=(500, 500),
+            linewidth=3,
+            c=1,
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        savefig("data-comp-psd-stim.png")
+
+        plot(
+            df_beta_amp_pdf_data[!, 1],
+            df_beta_amp_pdf_data[!, 2], 
+            xlabel="Amplitude",
+            title="Beta Amplitude PDF",
+            label="rest",
+            size=(500, 500),
+            linewidth=3,
+            c="black",
+            linestyle=:dot,
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        plot!(
+            df_beta_amp_pdf_data_stim[!, 1],
+            df_beta_amp_pdf_data_stim[!, 2], 
+            xlabel="Amplitude",
+            title="Beta Amplitude PDF",
+            label="stim",
+            size=(500, 500),
+            linewidth=3,
+            c=1,
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        savefig("data-comp-bapdf-stim.png")
+
+        plot(
+            df_beta_dur_pdf_data[!, 1],
+            df_beta_dur_pdf_data[!, 2], 
+            xlabel="Duration",
+            title="Beta Duration PDF",
+            label="rest",
+            size=(500, 500),
+            linewidth=3,
+            linestyle=:dot,
+            c="black",
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        plot!(
+            df_beta_dur_pdf_data_stim[!, 1],
+            df_beta_dur_pdf_data_stim[!, 2], 
+            xlabel="Duration",
+            title="Beta Duration PDF",
+            label="stim",
+            size=(500, 500),
+            linewidth=3,
+            c=1,
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        savefig("data-comp-bdpdf-stim.png")
+
+        plot(
+            df_plvs_data[!, 1],
+            df_plvs_data[!, 2], 
+            xlabel="Frequency",
+            title="Phase Locking Value",
+            label="rest",
+            size=(500, 500),
+            linewidth=3,
+            linestyle=:dot,
+            c="black",
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        plot!(
+            df_plvs_data_stim[!, 1],
+            df_plvs_data_stim[!, 2], 
+            xlabel="Frequency",
+            title="Phase Locking Value",
+            label="stim",
+            size=(500, 500),
+            linewidth=3,
+            c=1,
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        savefig("data-comp-plv-stim.png")
+    end
+
+    function plot_model_features_stim_effect()
+         #A = plus-stim
+
+         yPSDs_A = [[] for i in 1:100]
+         freq_A = []
+         yBAPDFS_A = [[] for i in 1:100]
+         xBAPDF_A = []
+         yBDPDFS_A = [[] for i in 1:100]
+         xBDPDF_A = []
+         yPLV_A = [[] for i in 1:100]
+         xPLV_A = []
+         
+         for i in 1:100
+             csv_path = "data/model-wc-plus-stim-block/"*string(i)
+ 
+             psd_df = CSV.read(csv_path*"/psd.csv", DataFrame)
+             freq_A = xPSD_A = psd_df[!, 1]
+             yPSDdat_A = psd_df[!, 2]
+             yPSDs_A[i]=  yPSDdat_A
+ 
+             bapdf_df = CSV.read(csv_path*"/bapdf.csv", DataFrame)
+             xBAPDF_A = bapdf_df[!, 1]
+             yBAPDFdat_A = bapdf_df[!, 2]
+             yBAPDFS_A[i] = yBAPDFdat_A
+ 
+             bdpdf_df = CSV.read(csv_path*"/bdpdf.csv", DataFrame)
+             xBDPDF_A = bdpdf_df[!, 1]
+             yBDPDFdat_A = bdpdf_df[!, 2]
+             yBDPDFS_A[i] = yBDPDFdat_A
+ 
+             plvs_df = CSV.read(csv_path*"/plvs.csv", DataFrame)
+             xPLV_A = plvs_df[!, 1]
+             yPLVdat_A = plvs_df[!, 2]
+             yPLV_A[i] = yPLVdat_A
+         end
+ 
+         yPSDs_B = [[] for i in 1:100]
+         freq_B = []
+         yBAPDFS_B = [[] for i in 1:100]
+         xBAPDF_B = []
+         yBDPDFS_B = [[] for i in 1:100]
+         xBDPDF_B = []
+         yPLV_B = [[] for i in 1:100]
+         xPLV_B = []
+ 
+         for i in 1:100
+             csv_path = "data/model/"*string(i)
+ 
+             psd_df = CSV.read(csv_path*"/psd.csv", DataFrame)
+             freq_B = xPSD_B = psd_df[!, 1]
+             yPSDdat_B = psd_df[!, 2]
+             yPSDs_B[i]=  yPSDdat_B
+ 
+             bapdf_df = CSV.read(csv_path*"/bapdf.csv", DataFrame)
+             xBAPDF_B = bapdf_df[!, 1]
+             yBAPDFdat_B = bapdf_df[!, 2]
+             yBAPDFS_B[i] = yBAPDFdat_B
+ 
+             bdpdf_df = CSV.read(csv_path*"/bdpdf.csv", DataFrame)
+             xBDPDF_B = bdpdf_df[!, 1]
+             yBDPDFdat_B = bdpdf_df[!, 2]
+             yBDPDFS_B[i] = yBDPDFdat_B
+ 
+             plvs_df = CSV.read(csv_path*"/plvs.csv", DataFrame)
+             xPLV_B = plvs_df[!, 1]
+             yPLVdat_B = plvs_df[!, 2]
+             yPLV_B[i] = yPLVdat_B
+         
+         end
+ 
+         psd_stds_A = []
+         for i in 1:length(yPSDs_A[1])
+             y = [yPSDs_A[j][i] for j in 1:100]
+             push!(psd_stds_A, std(y))
+         end
+ 
+         bapdf_stds_A = []
+         for i in 1:length(yBAPDFS_A[1])
+             y = [yBAPDFS_A[j][i] for j in 1:100]
+             push!(bapdf_stds_A, std(y))
+         end
+ 
+         bdpdf_stds_A = []
+         for i in 1:length(yBDPDFS_A[1])
+             y = [yBDPDFS_A[j][i] for j in 1:100]
+             push!(bdpdf_stds_A, std(y))
+         end
+ 
+         plv_stds_A = []
+         for i in 1:length(yPLV_A[1])
+             y = [yPLV_A[j][i] for j in 1:100]
+             push!(plv_stds_A, std(y))
+         end
+ 
+         psd_stds_B = []
+         for i in 1:length(yPSDs_B[1])
+             y = [yPSDs_B[j][i] for j in 1:100]
+             push!(psd_stds_B, std(y))
+         end
+ 
+         bapdf_stds_B = []
+         for i in 1:length(yBAPDFS_B[1])
+             y = [yBAPDFS_B[j][i] for j in 1:100]
+             push!(bapdf_stds_B, std(y))
+         end
+ 
+         bdpdf_stds_B = []
+         for i in 1:length(yBDPDFS_B[1])
+             y = [yBDPDFS_B[j][i] for j in 1:100]
+             push!(bdpdf_stds_B, std(y))
+         end
+ 
+         plv_stds_B = []
+         for i in 1:length(yPLV_B[1])
+             y = [yPLV_B[j][i] for j in 1:100]
+             push!(plv_stds_B, std(y))
+         end
+ 
+         plot(
+             freq_A,
+             mean(yPSDs_A, dims=1), 
+             ribbon=psd_stds_A,
+             fillalpha=.3,
+             xlabel="Frequency (Hz)",
+             title="Power Spectral Density",
+             label="stim",
+             size=(500, 500),
+             linewidth=3,
+             c=2,
+             xtickfont=12,
+             ytickfont=12,
+             titlefont=12,
+             guidefont=12,
+             tickfont=12,
+             legendfont=12,
+             margin=2.5mm
+         )
+         plot!(
+             freq_B,
+             mean(yPSDs_B, dims=1), 
+             ribbon=psd_stds_B,
+             fillalpha=.3,
+             xlabel="Frequency (Hz)",
+             title="Power Spectral Density",
+             label="rest",
+             size=(500, 500),
+             linewidth=3,
+             linestyle=:dot,
+             c="black",
+             xtickfont=12,
+             ytickfont=12,
+             titlefont=12,
+             guidefont=12,
+             tickfont=12,
+             legendfont=12,
+             margin=2.5mm
+         )
+         savefig("model-comp-stim-psd-rib.png")
+ 
+         plot(
+             xBAPDF_A,
+             mean(yBAPDFS_A, dims=1), 
+             ribbon=bapdf_stds_A,
+             fillalpha=.3,
+             xlabel="Amplitude",
+             title="Beta Amplitude PDF",
+             label="stim",
+             size=(500, 500),
+             linewidth=3,
+             c=2,
+             xtickfont=12,
+             ytickfont=12,
+             titlefont=12,
+             guidefont=12,
+             tickfont=12,
+             legendfont=12,
+             margin=2.5mm
+         )
+            plot!(
+                xBAPDF_B,
+                mean(yBAPDFS_B, dims=1), 
+                ribbon=bapdf_stds_B,
+                fillalpha=.3,
+                xlabel="Amplitude",
+                title="Beta Amplitude PDF",
+                label="rest",
+                size=(500, 500),
+                linewidth=3,
+                linestyle=:dot,
+                c="black",
+                xtickfont=12,
+                ytickfont=12,
+                titlefont=12,
+                guidefont=12,
+                tickfont=12,
+                legendfont=12,
+                margin=2.5mm
+            )
+
+         savefig("model-comp-stim-bapdf-rib.png")
+ 
+         plot(
+             xBDPDF_A,
+             mean(yBDPDFS_A, dims=1), 
+             ribbon=bdpdf_stds_A,
+             fillalpha=.3,
+             xlabel="Duration",
+             title="Beta Duration PDF",
+             label="stim",
+             size=(500, 500),
+             linewidth=3,
+             c=2,
+             xtickfont=12,
+             ytickfont=12,
+             titlefont=12,
+             guidefont=12,
+             tickfont=12,
+             legendfont=12,
+             margin=2.5mm
+         )
+            plot!(
+                xBDPDF_B,
+                mean(yBDPDFS_B, dims=1), 
+                ribbon=bdpdf_stds_B,
+                fillalpha=.3,
+                xlabel="Duration",
+                title="Beta Duration PDF",
+                label="rest",
+                size=(500, 500),
+                linewidth=3,
+                linestyle=:dot,
+                c="black",
+                xtickfont=12,
+                ytickfont=12,
+                titlefont=12,
+                guidefont=12,
+                tickfont=12,
+                legendfont=12,
+                margin=2.5mm
+            )
+
+         savefig("model-comp-stim-bdpdf-rib.png")
+
+         plot(
+             xPLV_A,
+             mean(yPLV_A, dims=1), 
+             ribbon=plv_stds_A,
+             fillalpha=.3,
+             xlabel="Frequency",
+             title="Phase Locking Value",
+             label="stim",
+             size=(500, 500),
+             linewidth=3,
+             c=2,
+             xtickfont=12,
+             ytickfont=12,
+             titlefont=12,
+             guidefont=12,
+             tickfont=12,
+             legendfont=12,
+             margin=2.5mm
+         )
+            plot!(
+                xPLV_B,
+                mean(yPLV_B, dims=1), 
+                ribbon=plv_stds_B,
+                fillalpha=.3,
+                xlabel="Frequency",
+                title="Phase Locking Value",
+                label="rest",
+                size=(500, 500),
+                linewidth=3,
+                linestyle=:dot,
+                c="black",
+                xtickfont=12,
+                ytickfont=12,
+                titlefont=12,
+                guidefont=12,
+                tickfont=12,
+                legendfont=12,
+                margin=2.5mm
+            )
+         
+         savefig("model-comp-stim-plv-rib.png")
+    end
+
+    function stim_effect_phase()
+        for i in 0:45:315
+            csv_data_path = "data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1"
+            df_psd_data = CSV.read(csv_data_path*"/psd.csv", DataFrame)
+            df_beta_amp_pdf_data = CSV.read(csv_data_path*"/bapdf.csv", DataFrame)
+            df_beta_dur_pdf_data = CSV.read(csv_data_path*"/bdpdf.csv", DataFrame)
+            df_plvs_data = CSV.read(csv_data_path*"/plvs.csv", DataFrame)
+
+            csv_data_path_stim = "data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase="*string(i)*"_STIM_EC_v1"
+            df_psd_data_stim = CSV.read(csv_data_path_stim*"/psd.csv", DataFrame)
+            df_beta_amp_pdf_data_stim = CSV.read(csv_data_path_stim*"/bapdf.csv", DataFrame)
+            df_beta_dur_pdf_data_stim = CSV.read(csv_data_path_stim*"/bdpdf.csv", DataFrame)
+            df_plvs_data_stim = CSV.read(csv_data_path_stim*"/plvs.csv", DataFrame)
+
+            data_psd_diff = (maximum(df_psd_data[!, 2]) - maximum(df_psd_data_stim[!, 2])) / maximum(df_psd_data[!, 2])
+            data_bapdf_diff = (df_beta_amp_pdf_data[!, 1][argmax(df_beta_amp_pdf_data[!, 2])] - df_beta_amp_pdf_data_stim[!, 1][argmax(df_beta_amp_pdf_data_stim[!, 2])]) / df_beta_amp_pdf_data[!, 1][argmax(df_beta_amp_pdf_data[!, 2])]
+            data_bdpdf_diff = (df_beta_dur_pdf_data[!, 1][argmax(df_beta_dur_pdf_data[!, 2])] - df_beta_dur_pdf_data_stim[!, 1][argmax(df_beta_dur_pdf_data_stim[!, 2])]) / df_beta_dur_pdf_data[!, 1][argmax(df_beta_dur_pdf_data[!, 2])]
+            data_plv_diff = (maximum(df_plvs_data[!, 2]) - maximum(df_plvs_data_stim[!, 2])) / maximum(df_plvs_data[!, 2])
+
+            yPSDs_A = [[] for i in 1:25]
+            freq_A = []
+            yBAPDFS_A = [[] for i in 1:25]
+            xBAPDF_A = []
+            yBDPDFS_A = [[] for i in 1:25]
+            xBDPDF_A = []
+            yPLV_A = [[] for i in 1:25]
+            xPLV_A = []
+            
+            for j in 1:25
+                csv_path = "data/model-wc-plus-stim-resp-"*string(i)*"/"*string(j)
+    
+                psd_df = CSV.read(csv_path*"/psd.csv", DataFrame)
+                freq_A = xPSD_A = psd_df[!, 1]
+                yPSDdat_A = psd_df[!, 2]
+                yPSDs_A[j]=  yPSDdat_A
+    
+                bapdf_df = CSV.read(csv_path*"/bapdf.csv", DataFrame)
+                xBAPDF_A = bapdf_df[!, 1]
+                yBAPDFdat_A = bapdf_df[!, 2]
+                yBAPDFS_A[j] = yBAPDFdat_A
+    
+                bdpdf_df = CSV.read(csv_path*"/bdpdf.csv", DataFrame)
+                xBDPDF_A = bdpdf_df[!, 1]
+                yBDPDFdat_A = bdpdf_df[!, 2]
+                yBDPDFS_A[j] = yBDPDFdat_A
+    
+                plvs_df = CSV.read(csv_path*"/plvs.csv", DataFrame)
+                xPLV_A = plvs_df[!, 1]
+                yPLVdat_A = plvs_df[!, 2]
+                yPLV_A[j] = yPLVdat_A
+            end
+
+            yPSDs_B = [[] for i in 1:100]
+            freq_B = []
+            yBAPDFS_B = [[] for i in 1:100]
+            xBAPDF_B = []
+            yBDPDFS_B = [[] for i in 1:100]
+            xBDPDF_B = []
+            yPLV_B = [[] for i in 1:100]
+            xPLV_B = []
+
+            for j in 1:100
+                csv_path = "data/model/"*string(j)
+    
+                psd_df = CSV.read(csv_path*"/psd.csv", DataFrame)
+                freq_B = xPSD_B = psd_df[!, 1]
+                yPSDdat_B = psd_df[!, 2]
+                yPSDs_B[j]=  yPSDdat_B
+    
+                bapdf_df = CSV.read(csv_path*"/bapdf.csv", DataFrame)
+                xBAPDF_B = bapdf_df[!, 1]
+                yBAPDFdat_B = bapdf_df[!, 2]
+                yBAPDFS_B[j] = yBAPDFdat_B
+    
+                bdpdf_df = CSV.read(csv_path*"/bdpdf.csv", DataFrame)
+                xBDPDF_B = bdpdf_df[!, 1]
+                yBDPDFdat_B = bdpdf_df[!, 2]
+                yBDPDFS_B[j] = yBDPDFdat_B
+    
+                plvs_df = CSV.read(csv_path*"/plvs.csv", DataFrame)
+                xPLV_B = plvs_df[!, 1]
+                yPLVdat_B = plvs_df[!, 2]
+                yPLV_B[j] = yPLVdat_B
+            
+            end
+
+            model_psd_diff = (maximum(mean(yPSDs_B, dims=1)[1]) - maximum(mean(yPSDs_A, dims=1)[1])) / maximum(mean(yPSDs_B, dims=1)[1])
+            model_bapdf_diff = (mean(yBAPDFS_B, dims=1)[1][argmax(mean(yBAPDFS_B, dims=1)[1])] - mean(yBAPDFS_A, dims=1)[1][argmax(mean(yBAPDFS_A, dims=1)[1])]) / mean(yBAPDFS_B, dims=1)[1][argmax(mean(yBAPDFS_B, dims=1)[1])]
+            model_bdpdf_diff = (mean(yBDPDFS_B, dims=1)[1][argmax(mean(yBDPDFS_B, dims=1)[1])] - mean(yBDPDFS_A, dims=1)[1][argmax(mean(yBDPDFS_A, dims=1)[1])]) / mean(yBDPDFS_B, dims=1)[1][argmax(mean(yBDPDFS_B, dims=1)[1])]
+            model_plv_diff = (maximum(mean(yPLV_B, dims=1)[1]) - maximum(mean(yPLV_A, dims=1)[1])) / maximum(mean(yPLV_B, dims=1)[1])
+
+            println("Phase: ", i)
+
+            println("Data PSD: ", data_psd_diff)
+            println("Model PSD: ", model_psd_diff)
+            println("Data BAPDF: ", data_bapdf_diff)
+            println("Model BAPDF: ", model_bapdf_diff)
+            println("Data BDPDF: ", data_bdpdf_diff)
+            println("Model BDPDF: ", model_bdpdf_diff)
+            println("Data PLV: ", data_plv_diff)
+            println("Model PLV: ", model_plv_diff) 
+            println()
+        end
+    end
+
+    function plot_focussed_psd()
+        csv_data_path = "data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1"
+        df_psd_data_rest = CSV.read(csv_data_path*"/psd.csv", DataFrame)   
+        
+        #0vs180
+        p1 = plot(
+            df_psd_data_rest[!, 1],
+            df_psd_data_rest[!, 2], 
+            xlabel="Frequency (Hz)",
+            ylabel="Power Change",
+            title="0 (o) vs. 180 (g)",
+            legend=false,
+            size=(600, 500),
+            xlim=(6, 16),
+            xticks=6:2:16,
+            linewidth=3,
+            c="black",
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+
+        csv_data_path = "data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_STIM_EC_v1"
+        df_psd_data_stim_0 = CSV.read(csv_data_path*"/psd.csv", DataFrame)  
+        plot!(p1, df_psd_data_stim_0[!, 1], df_psd_data_stim_0[!, 2], linewidth=3)
+        csv_data_path = "data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=180_STIM_EC_v1"
+        df_psd_data_stim_180 = CSV.read(csv_data_path*"/psd.csv", DataFrame)  
+        plot!(p1, df_psd_data_stim_180[!, 1], df_psd_data_stim_180[!, 2], linewidth=3)
+
+        #45vs225
+        p2 = plot(
+            df_psd_data_rest[!, 1],
+            df_psd_data_rest[!, 2], 
+            xlabel="Frequency (Hz)",
+            ylabel="Power Change",
+            title="45 (o) vs. 225 (g)",
+            legend=false,
+            size=(600, 500),
+            xlim=(6, 16),
+            xticks=6:2:16,
+            linewidth=3,
+            c="black",
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+
+        csv_data_path = "data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=45_STIM_EC_v1"
+        df_psd_data_stim_45 = CSV.read(csv_data_path*"/psd.csv", DataFrame)  
+        plot!(p2, df_psd_data_stim_45[!, 1], df_psd_data_stim_45[!, 2], linewidth=3)
+        csv_data_path = "data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=225_STIM_EC_v1"
+        df_psd_data_stim_225 = CSV.read(csv_data_path*"/psd.csv", DataFrame)  
+        plot!(p2, df_psd_data_stim_225[!, 1], df_psd_data_stim_225[!, 2], linewidth=3)
+
+        #90vs270
+        p3 = plot(
+            df_psd_data_rest[!, 1],
+            df_psd_data_rest[!, 2], 
+            xlabel="Frequency (Hz)",
+            ylabel="Power Change",
+            title="90 (o) vs. 270 (g)",
+            legend=false,
+            size=(600, 500),
+            xlim=(6, 16),
+            xticks=6:2:16,
+            linewidth=3,
+            c="black",
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+
+        csv_data_path = "data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=90_STIM_EC_v1"
+        df_psd_data_stim_90 = CSV.read(csv_data_path*"/psd.csv", DataFrame)  
+        plot!(p3, df_psd_data_stim_90[!, 1], df_psd_data_stim_90[!, 2], linewidth=3)
+        csv_data_path = "data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=270_STIM_EC_v1"
+        df_psd_data_stim_270 = CSV.read(csv_data_path*"/psd.csv", DataFrame)  
+        plot!(p3, df_psd_data_stim_270[!, 1], df_psd_data_stim_270[!, 2], linewidth=3)
+
+        #135vs315
+        p4 = plot(
+            df_psd_data_rest[!, 1],
+            df_psd_data_rest[!, 2], 
+            xlabel="Frequency (Hz)",
+            ylabel="Power Change",
+            title="135 (o) vs. 315 (g)",
+            legend=false,
+            size=(600, 500),
+            xlim=(6, 16),
+            xticks=6:2:16,
+            linewidth=3,
+            c="black",
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+
+        csv_data_path = "data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=135_STIM_EC_v1"
+        df_psd_data_stim_135 = CSV.read(csv_data_path*"/psd.csv", DataFrame)  
+        plot!(p4, df_psd_data_stim_135[!, 1], df_psd_data_stim_90[!, 2], linewidth=3)
+        csv_data_path = "data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=270_STIM_EC_v1"
+        df_psd_data_stim_315 = CSV.read(csv_data_path*"/psd.csv", DataFrame)  
+        plot!(p4, df_psd_data_stim_315[!, 1], df_psd_data_stim_315[!, 2], linewidth=3)
+
+        plot(p1, p2, p3, p4, layout=grid(2, 2))
+        savefig("focussed-psd-data.png")
+
+        yPSDs_Rest = [[] for i in 1:100]
+        xPSDs_Rest = []
+        for i in 1:100
+            csv_path = "data/model/"*string(i)
+
+            psd_df = CSV.read(csv_path*"/psd.csv", DataFrame)
+            xPSDs_Rest = psd_df[!, 1]
+            yPSDdat = psd_df[!, 2]
+            yPSDs_Rest[i]=  yPSDdat
+        end
+
+        yPSDs_0 = [[] for i in 1:25]
+        xPSDs_0 = []
+        for j in 1:25
+            csv_path = "data/model-wc-plus-stim-resp-0/"*string(j)
+
+            psd_df = CSV.read(csv_path*"/psd.csv", DataFrame)
+            xPSDs_0 = psd_df[!, 1]
+            yPSDdat_A = psd_df[!, 2]
+            yPSDs_0[j]=  yPSDdat_A
+        end
+
+        yPSDs_180 = [[] for i in 1:25]
+        xPSDs_180 = []
+        for j in 1:25
+            csv_path = "data/model-wc-plus-stim-resp-180/"*string(j)
+            psd_df = CSV.read(csv_path*"/psd.csv", DataFrame)
+            xPSDs_180 = psd_df[!, 1]
+            yPSDdat_A = psd_df[!, 2]
+            yPSDs_180[j]=  yPSDdat_A
+        end
+
+        yPSDs_45 = [[] for i in 1:25]
+        xPSDs_45 = []
+        for j in 1:25
+            csv_path = "data/model-wc-plus-stim-resp-45/"*string(j)
+
+            psd_df = CSV.read(csv_path*"/psd.csv", DataFrame)
+            xPSDs_45 = psd_df[!, 1]
+            yPSDdat_A = psd_df[!, 2]
+            yPSDs_45[j]=  yPSDdat_A
+        end
+
+        yPSDs_225 = [[] for i in 1:25]
+        xPSDs_225 = []
+        for j in 1:25
+            csv_path = "data/model-wc-plus-stim-resp-225/"*string(j)
+
+            psd_df = CSV.read(csv_path*"/psd.csv", DataFrame)
+            xPSDs_225 = psd_df[!, 1]
+            yPSDdat_A = psd_df[!, 2]
+            yPSDs_225[j]=  yPSDdat_A
+        end
+
+        yPSDs_90 = [[] for i in 1:25]
+        xPSDs_90 = []
+        for j in 1:25
+            csv_path = "data/model-wc-plus-stim-resp-90/"*string(j)
+
+            psd_df = CSV.read(csv_path*"/psd.csv", DataFrame)
+            xPSDs_90 = psd_df[!, 1]
+            yPSDdat_A = psd_df[!, 2]
+            yPSDs_90[j]=  yPSDdat_A
+        end
+
+        yPSDs_270 = [[] for i in 1:25]
+        xPSDs_270 = []
+        for j in 1:25
+            csv_path = "data/model-wc-plus-stim-resp-270/"*string(j)
+
+            psd_df = CSV.read(csv_path*"/psd.csv", DataFrame)
+            xPSDs_270 = psd_df[!, 1]
+            yPSDdat_A = psd_df[!, 2]
+            yPSDs_270[j]=  yPSDdat_A
+        end
+
+        yPSDs_135 = [[] for i in 1:25]
+        xPSDs_135 = []
+        for j in 1:25
+            csv_path = "data/model-wc-plus-stim-resp-135/"*string(j)
+
+            psd_df = CSV.read(csv_path*"/psd.csv", DataFrame)
+            xPSDs_135 = psd_df[!, 1]
+            yPSDdat_A = psd_df[!, 2]
+            yPSDs_135[j]=  yPSDdat_A
+        end
+
+        yPSDs_315 = [[] for i in 1:25]
+        xPSDs_315 = []
+        for j in 1:25
+            csv_path = "data/model-wc-plus-stim-resp-315/"*string(j)
+
+            psd_df = CSV.read(csv_path*"/psd.csv", DataFrame)
+            xPSDs_315 = psd_df[!, 1]
+            yPSDdat_A = psd_df[!, 2]
+            yPSDs_315[j]=  yPSDdat_A
+        end
+
+        #0vs180
+        p1 = plot(
+            xPSDs_Rest,
+            mean(yPSDs_Rest, dims=1),
+            xlabel="Frequency (Hz)",
+            ylabel="Power Change",
+            title="0 (o) vs. 180 (g)",
+            legend=false,
+            size=(600, 500),
+            xlim=(6, 16),
+            xticks=6:2:16,
+            linewidth=3,
+            c="black",
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        plot!(p1, xPSDs_0, mean(yPSDs_0, dims=1), linewidth=3)
+        plot!(p1, xPSDs_180, mean(yPSDs_180, dims=1), linewidth=3)
+        
+        #45vs225
+        p2 = plot(
+            xPSDs_Rest,
+            mean(yPSDs_Rest, dims=1),
+            xlabel="Frequency (Hz)",
+            ylabel="Power Change",
+            title="45 (o) vs. 225 (g)",
+            legend=false,
+            size=(600, 500),
+            xlim=(6, 16),
+            xticks=6:2:16,
+            linewidth=3,
+            c="black",
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        plot!(p2, xPSDs_45, mean(yPSDs_45, dims=1), linewidth=3)
+        plot!(p2, xPSDs_225, mean(yPSDs_225, dims=1), linewidth=3)
+
+        #90vs270
+        p3 = plot(
+            xPSDs_Rest,
+            mean(yPSDs_Rest, dims=1),
+            xlabel="Frequency (Hz)",
+            ylabel="Power Change",
+            title="90 (o) vs. 270 (g)",
+            legend=false,
+            size=(600, 500),
+            xlim=(6, 16),
+            xticks=6:2:16,
+            linewidth=3,
+            c="black",
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        plot!(p3, xPSDs_90, mean(yPSDs_90, dims=1), linewidth=3)
+        plot!(p3, xPSDs_270, mean(yPSDs_270, dims=1), linewidth=3)
+
+        #135vs315
+        p4 = plot(
+            xPSDs_Rest,
+            mean(yPSDs_Rest, dims=1),
+            xlabel="Frequency (Hz)",
+            ylabel="Power Change",
+            title="135 (o) vs. 315 (g)",
+            legend=false,
+            size=(600, 500),
+            xlim=(6, 16),
+            xticks=6:2:16,
+            linewidth=3,
+            c="black",
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        plot!(p4, xPSDs_135, mean(yPSDs_135, dims=1), linewidth=3)
+        plot!(p4, xPSDs_315, mean(yPSDs_315, dims=1), linewidth=3)
+
+        plot(p1, p2, p3, p4, layout=grid(2, 2))
+        savefig("focussed-psd-model.png")
+
+        ##SUBTRACT
+
+        #0vs180
+        p1 = plot(
+            df_psd_data_rest[!, 1],
+            [0.0 for i in df_psd_data_rest[!, 2]], 
+            xlabel="Frequency (Hz)",
+            ylabel="Power Change",
+            title="0 (o) vs. 180 (g)",
+            legend=false,
+            size=(600, 500),
+            xlim=(6, 16),
+            xticks=6:2:16,
+            linewidth=1.5,
+            linestyle=:dash,
+            c="black",
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        plot!(p1, df_psd_data_stim_0[!, 1], df_psd_data_stim_0[!, 2] - df_psd_data_rest[!, 2], linewidth=3)
+        plot!(p1, df_psd_data_stim_180[!, 1], df_psd_data_stim_180[!, 2] - df_psd_data_rest[!, 2], linewidth=3)
+
+        #45vs225
+        p2 = plot(
+            df_psd_data_rest[!, 1],
+            [0.0 for i in df_psd_data_rest[!, 2]], 
+            xlabel="Frequency (Hz)",
+            ylabel="Power Change",
+            title="45 (o) vs. 225 (g)",
+            legend=false,
+            size=(600, 500),
+            xlim=(6, 16),
+            xticks=6:2:16,
+            linewidth=1.5,
+            linestyle=:dash,
+            c="black",
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        plot!(p2, df_psd_data_stim_45[!, 1], df_psd_data_stim_45[!, 2] - df_psd_data_rest[!, 2], linewidth=3)
+        plot!(p2, df_psd_data_stim_225[!, 1], df_psd_data_stim_225[!, 2] - df_psd_data_rest[!, 2], linewidth=3)
+
+        #90vs270
+        p3 = plot(
+            df_psd_data_rest[!, 1],
+            [0.0 for i in df_psd_data_rest[!, 2]], 
+            xlabel="Frequency (Hz)",
+            ylabel="Power Change",
+            title="90 (o) vs. 270 (g)",
+            legend=false,
+            size=(600, 500),
+            xlim=(6, 16),
+            xticks=6:2:16,
+            linewidth=1.5,
+            linestyle=:dash,
+            c="black",
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        plot!(p3, df_psd_data_stim_90[!, 1], df_psd_data_stim_90[!, 2] - df_psd_data_rest[!, 2], linewidth=3)
+        plot!(p3, df_psd_data_stim_270[!, 1], df_psd_data_stim_270[!, 2] - df_psd_data_rest[!, 2], linewidth=3)
+
+        #135vs315
+        p4 = plot(
+            df_psd_data_rest[!, 1],
+            [0.0 for i in df_psd_data_rest[!, 2]], 
+            xlabel="Frequency (Hz)",
+            ylabel="Power Change",
+            title="135 (o) vs. 315 (g)",
+            legend=false,
+            size=(600, 500),
+            xlim=(6, 16),
+            xticks=6:2:16,
+            linewidth=1.5,
+            linestyle=:dash,
+            c="black",
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        plot!(p4, df_psd_data_stim_135[!, 1], df_psd_data_stim_135[!, 2] - df_psd_data_rest[!, 2], linewidth=3)
+        plot!(p4, df_psd_data_stim_315[!, 1], df_psd_data_stim_315[!, 2] - df_psd_data_rest[!, 2], linewidth=3)
+
+        plot(p1, p2, p3, p4, layout=grid(2, 2))
+        savefig("focussed-psd-diff.png")
+
+        #SUBTRACT MODEL
+        p1 = plot(
+            xPSDs_Rest,
+            [0.0 for i in mean(yPSDs_Rest, dims=1)[1]],
+            xlabel="Frequency (Hz)",
+            ylabel="Power Change",
+            title="0 (o) vs. 180 (g)",
+            legend=false,
+            size=(600, 500),
+            xlim=(6, 16),
+            xticks=6:2:16,
+            linewidth=1.5,
+            linestyle=:dash,
+            c="black",
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        plot!(p1, xPSDs_0, mean(yPSDs_0, dims=1)[1] - mean(yPSDs_Rest, dims=1)[1], linewidth=3)
+        plot!(p1, xPSDs_180, mean(yPSDs_180, dims=1)[1] - mean(yPSDs_Rest, dims=1)[1], linewidth=3)
+
+        p2 = plot(
+            xPSDs_Rest,
+            [0.0 for i in mean(yPSDs_Rest, dims=1)[1]],
+            xlabel="Frequency (Hz)",
+            ylabel="Power Change",
+            title="45 (o) vs. 225 (g)",
+            legend=false,
+            size=(600, 500),
+            xlim=(6, 16),
+            xticks=6:2:16,
+            linewidth=1.5,
+            linestyle=:dash,
+            c="black",
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        plot!(p2, xPSDs_45, mean(yPSDs_45, dims=1)[1] - mean(yPSDs_Rest, dims=1)[1], linewidth=3)
+        plot!(p2, xPSDs_225, mean(yPSDs_225, dims=1)[1] - mean(yPSDs_Rest, dims=1)[1], linewidth=3)
+
+        p3 = plot(
+            xPSDs_Rest,
+            [0.0 for i in mean(yPSDs_Rest, dims=1)[1]],
+            xlabel="Frequency (Hz)",
+            ylabel="Power Change",
+            title="90 (o) vs. 270 (g)",
+            legend=false,
+            size=(600, 500),
+            xlim=(6, 16),
+            xticks=6:2:16,
+            linewidth=1.5,
+            linestyle=:dash,
+            c="black",
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        plot!(p3, xPSDs_90, mean(yPSDs_90, dims=1)[1] - mean(yPSDs_Rest, dims=1)[1], linewidth=3)
+        plot!(p3, xPSDs_270, mean(yPSDs_270, dims=1)[1] - mean(yPSDs_Rest, dims=1)[1], linewidth=3)
+
+        p4 = plot(
+            xPSDs_Rest,
+            [0.0 for i in mean(yPSDs_Rest, dims=1)[1]],
+            xlabel="Frequency (Hz)",
+            ylabel="Power Change",
+            title="135 (o) vs. 315 (g)",
+            legend=false,
+            size=(600, 500),
+            xlim=(6, 16),
+            xticks=6:2:16,
+            linewidth=1.5,
+            linestyle=:dash,
+            c="black",
+            xtickfont=12,
+            ytickfont=12,
+            titlefont=12,
+            guidefont=12,
+            tickfont=12,
+            legendfont=12,
+            margin=2.5mm
+        )
+        plot!(p4, xPSDs_135, mean(yPSDs_135, dims=1)[1] - mean(yPSDs_Rest, dims=1)[1], linewidth=3)
+        plot!(p4, xPSDs_315, mean(yPSDs_315, dims=1)[1] - mean(yPSDs_Rest, dims=1)[1], linewidth=3)
+
+        plot(p1, p2, p3, p4, layout=grid(2, 2))
+        savefig("focussed-psd-diff-model.png")
+
+        
+    end
+
+
 end
+
+#analysis.plot_focussed_psd()
 
 #analysis.analyse_all_flat()
 #analysis.get_raw("P20", "15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1", 2001, 3000)
@@ -1473,6 +2601,11 @@ end
 #analysis.plot_example_bursts()
 
 #analysis.plot_feature_ribbons("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1")
-#analysis.plot_feature_costs("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1")
+analysis.plot_feature_costs("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1")
 #analysis.plot_feature_ribbons_stim_pair("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=180_STIM_EC_v1")
-analysis.plot_feature_costs_stim_pair("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=180_STIM_EC_v1")
+#analysis.plot_feature_costs_stim_pair("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=180_STIM_EC_v1")
+#analysis.plot_data_features_data_stimeffect("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1", "data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=180_STIM_EC_v1")
+#analysis.plot_model_features_stim_effect()
+#analysis.plot_feature_costs_stim_pair("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1")
+
+#analysis.stim_effect_phase()

@@ -62,6 +62,7 @@ module Stimulation
             end
         end
         return create_stim_response(stim, range_t)
+        #return stim .*100
     end
 
     function test_stim()

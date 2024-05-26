@@ -105,7 +105,7 @@ end
 
 function plot_md_spec()
     df_psd_1= CSV.read("data/model/psd-16.csv", DataFrame)   
-    df_psd_2 = CSV.read("data/P14/12_02_2024_P14_Ch14_FRQ=10Hz_FULL_CL_phase=0_OL11Hz_STIM_EC_v2/psd.csv", DataFrame)
+    df_psd_2 = CSV.read("data/model/psd.csv", DataFrame)
 
     plot(
         df_psd_1[!, 1],
@@ -122,7 +122,7 @@ function plot_md_spec()
         titlefont=12,
         guidefont=12,
         tickfont=12,
-        c=3
+        c=2
     )
     plot!(
         df_psd_2[!, 1],
@@ -461,7 +461,7 @@ function plot_hilbert_amplitude_pdf(signal::Array{Float32, 1},T, sampling_rate, 
 
 end
 
-function main_raf(p; csv_path = "data/model")
+function main_raf(p, phase; csv_path = "data/model")
     # Parameters (time in s)
     N=2
     #[0.0147128, 19.451, 19.0874, 24.8283, 10.9761, -26.5766, 15.5643]
@@ -520,7 +520,7 @@ function main_raf(p; csv_path = "data/model")
    # p = [0.0103056, 0.238631, 7.27788, 4.41397, 8.84963, 0.154915, 0.0, 4.92246, 0.102291]
    # p = [0.0167882, 0.47009, 9.81269, 8.75759, 4.55063, 0.113229, 0.0, 0.749659, -5.39723]
     #Alpha oscillations
-    #p = [0.016, 2.4, 2.0, 2.0, 4.0, 0.75, 0.5, 0.0]
+    #p = [0.016, 2.4, 2.0, 2.0, 4.0, 0.0, 0.5, 0.0]
 
     #p = [0.0167907, 1.84502, 8.10264, 4.90234, 3.76054, 0.0673752, 0.0, 0.275149, -2.27837]
 
@@ -547,12 +547,12 @@ function main_raf(p; csv_path = "data/model")
     sampling_rate = 1.0 / dt
 
     stimBlock = create_stim_block(100.0, 25, 25, 0.0:dt:100.0, 1)
-    #plot(stimBlock)
-    #savefig("./myplot.png")
+    plot(stimBlock)
+    savefig("./myplot.png")
     SR = 1000.0
     gamma_param = 0.1 # or 0.05
     OT_suppress = 0.3
-    target_phase = pi / 2.0
+    target_phase = phase * pi / 180.0
     target_freq = 10.0
     oscilltracker = Oscilltracker(target_freq, target_phase, SR, OT_suppress, gamma_param)
 
@@ -588,8 +588,8 @@ function main_raf(p; csv_path = "data/model")
     raw_model_signal = (cut_model_signal .- mean(cut_model_signal)) ./ std(cut_model_signal)
     raw_model_alt_signal = (cut_model_alt_signal .- mean(cut_model_alt_signal)) ./ std(cut_model_alt_signal)
 
-    #plot(1:length(raw_model_signal), raw_model_signal, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=5, xtickfont=22, ytickfont=22, legend=false, titlefont=22, guidefont=22, tickfont=22, legendfont=22)
-    #savefig("plots/optim/model/raw.png")
+    plot(1:length(raw_model_signal), raw_model_signal, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=5, xtickfont=22, ytickfont=22, legend=false, titlefont=22, guidefont=22, tickfont=22, legendfont=22)
+    savefig("plots/optim/model/raw.png")
 
     model_flt_beta = get_beta_data(cut_model_signal)
     model_flt_beta = (model_flt_beta .- mean(model_flt_beta)) ./ std(model_flt_beta)  
@@ -602,8 +602,8 @@ function main_raf(p; csv_path = "data/model")
     run_beta_burst(model_flt_beta, plot_path, csv_path)
     run_plv(raw_model_signal, raw_model_alt_signal, plot_path, csv_path)
  
-    plot(df.sd[1])
-    savefig("plots/optim/model/stim_delivered.png")
+    #plot(df.sd[1])
+    #savefig("plots/optim/model/stim_delivered.png")
 
     # E-I plots
     #=raw_model_signal_I = (df.R[1].rI .- mean(df.R[1].rI)) ./ std(df.R[1].rI)
@@ -694,7 +694,7 @@ function main_raf(p; csv_path = "data/model")
     savefig("plots/diss/wc-oscill-alpha-noise.png")=#
 end
 
-function main_byrne()
+function main_byrne(params; csv_path = "data/model")
     # Parameters (time in ms)
     #p = [23.1, 1.0, 0.5, 0.5, 0.5, 0.5, 0.0, 0.0, 0.0]
     #p = [16.0, 2.0, 1.0, 1.0, 0.5, 0.5, 0.0, 0.0, 0.0]
@@ -702,27 +702,52 @@ function main_byrne()
     #F1 - data/P7/06_02_2024_P7_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1
     #p = [23.0953, 0.762638, 0.657167, 0.347283, 0.0464327, 0.5, 0.0, 3.92163, 1.51794]
 
+    params1 = [1.99664, -1.2831, 0.538196, 0.630927, 2.17939, -2.61223, 1.63868, 0.455764, 0.264489, 0.489085, 0.486056, 0.0]
+    #params2 = [34.2104, 1.78662, -1.70839, 0.977059, 0.00173827, 0.275055, -1.82158, 2.18014, 0.296708, 0.134904, 0.433616, 0.1]
+    params = [34.0491, 0.286157, -0.958979, 0.364366, 0.0278311, 2.49529, -0.111033, 2.45484, 0.371314, 0.0385027, 0.480408, 0.196578]
+
     N=2
     W=[Float32(0.0) Float32(1.0); Float32(1.0) Float32(0.0)]
-    etta=Float32(0.0)
+    etta=Float32(0.5)
 
-    tau = Float32(1000.0)
-    ex_E = Float32(5.0)
-    ex_I = Float32(-3.0)
-    kv_E = Float32(0.5)
-    kv_I = Float32(0.5)
+    tau = Float32(params[1])
+    ex_E = Float32(params[2])
+    ex_I = Float32(params[3])
+    kv_E = Float32(params[4])
+    kv_I = Float32(params[5])
     
-    ks_EE = Float32(15.0)
-    ks_EI = Float32(-15.0)
-    ks_IE = Float32(25.0)
-    ks_II = Float32(-15.0)
-    kv_EI = Float32(0.0)
-    alpha_EE = Float32(0.2)
-    alpha_EI = Float32(0.07)
-    alpha_IE = Float32(0.1)
-    alpha_II = Float32(0.06)
+    ks_EE = Float32(params[6])
+    ks_EI = Float32(params[7]) 
+    ks_IE = Float32(params[8])
+    ks_II = Float32(0.0)
+    kv_EI = Float32(params[9])
+
+    alpha_EE = Float32(params[10])
+    alpha_EI = Float32(params[11])
+    alpha_IE = Float32(params[11])
+    alpha_II = Float32(0.0)
+    #gamma = Float32(params[10])
+    noise_dev = Float32(params[12])
+
+   #= tau = Float32(32.0)
+    ex_E = Float32(1.0)
+    ex_I = Float32(0.0)
+    #kv_E = Float32(1.0)
+    kv_I = Float32(1.0)
+    
+    ks_EE = Float32(1.0)
+    ks_EI = Float32(1.0) 
+    ks_IE = Float32(1.0)
+    ks_II = Float32(1.0)
+    kv_EI = Float32(1.0)
+
+    alpha_EE = Float32(0.5)
+    alpha_EI = Float32(0.5)
+    alpha_IE = Float32(0.5)
+    alpha_II = Float32(0.5)=#
+
     gamma = Float32(0.5)
-    noise_dev = Float32(0.0)
+    #noise_dev = Float32(0.0)
 
     thE_A = Float32(0.0)
     thI_A = Float32(0.0)
@@ -748,6 +773,8 @@ function main_byrne()
     #df = run_byrne_single(p, simulate_byrne_pop, range_t, dt)
     #df = run_byrne_if(p, simulate_if_pop, range_t, dt)
     df= run_byrne_net(model, simulate_byrne_EI_network, range_t, T, dt, theta_E, theta_I, [])
+    print(df)
+    return
 
     #timescale now ms
 
@@ -759,33 +786,37 @@ function main_byrne()
     raw_model_signal = (cut_model_signal .- mean(cut_model_signal)) ./ std(cut_model_signal)
     raw_model_alt_signal = (cut_model_alt_signal .- mean(cut_model_alt_signal)) ./ std(cut_model_alt_signal)
 
+    #max = maximum(abs.(raw_model_signal[5000:6000]))
+    #min = minimum(abs.(raw_model_signal[5000:6000]))
+    #return max, min
+    #return
+
     #plot(1:length(raw_model_signal), raw_model_signal, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=5, xtickfont=22, ytickfont=22, legend=false, titlefont=22, guidefont=22, tickfont=22, legendfont=22)
     #savefig("plots/optim/model/raw.png")
 
-    #model_flt_beta = get_beta_data(cut_model_signal)
-    #model_flt_beta = (model_flt_beta .- mean(model_flt_beta)) ./ std(model_flt_beta)  
+    model_flt_beta = get_beta_data(cut_model_signal)
+    model_flt_beta = (model_flt_beta .- mean(model_flt_beta)) ./ std(model_flt_beta)  
 
     plot_path = "plots/optim/model"
-    csv_path = "data/model"
 
     df_csv = DataFrame(t=range_t, raw=raw_model_alt_signal)
     CSV.write(csv_path*"/raw.csv", df_csv)
  
     run_spec(raw_model_signal, plot_path, csv_path)
-    #run_hilbert_pdf(raw_model_signal, true)
+    run_hilbert_pdf(raw_model_signal, true)
  
-    #run_beta_burst(model_flt_beta, plot_path, csv_path)
-    #run_plv(raw_model_signal, raw_model_alt_signal, plot_path, csv_path)
+    run_beta_burst(model_flt_beta, plot_path, csv_path)
+    run_plv(raw_model_signal, raw_model_alt_signal, plot_path, csv_path)
  
-    #plot(1:length(model_flt_beta), model_flt_beta, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=5, xtickfont=22, ytickfont=22, legend=false, titlefont=22, guidefont=22, tickfont=22, legendfont=22)
-    #savefig("plots/optim/model/flt_beta.png")
+    plot(1:length(model_flt_beta), model_flt_beta, xlabel="time (s)", ylabel="amplitude", size=(500,500), linewidth=5, xtickfont=22, ytickfont=22, legend=false, titlefont=22, guidefont=22, tickfont=22, legendfont=22)
+    savefig("plots/optim/model/flt_beta.png")
 
     # E-I plots
     raw_model_signal_I = (df.R[1].rV_I .- mean(df.R[1].rV_I)) ./ std(df.R[1].rV_I)
     raw_model_alt_signal_I = (df.R[2].rV_I .- mean(df.R[2].rV_I)) ./ std(df.R[2].rV_I)
     p1 = plot(
-        range_t[1:10000],
-        raw_model_signal[1:10000], 
+        range_t[1:1000],
+        raw_model_signal[1:1000], 
         xlabel="Time (s)", 
         title="Activity of Node 1",
         xticks=0:200.0:10000.0,
@@ -804,8 +835,8 @@ function main_byrne()
         )
     plot!(
         p1,
-        range_t[1:10000],
-        raw_model_signal_I[1:10000],
+        range_t[1:1000],
+        raw_model_signal_I[1:1000],
         xlabel="Time (s)",
         title="Activity of Node 1",
         xticks=0:2000.0:10000.0,
@@ -823,8 +854,8 @@ function main_byrne()
         legendfont=22,
         )
     p2 = plot(
-        range_t[1:10000],
-        raw_model_alt_signal[1:10000], 
+        range_t[1:1000],
+        raw_model_alt_signal[1:1000], 
         xlabel="Time (s)", 
         title="Activity of Node 2",
         size=(1000, 1000),
@@ -840,8 +871,8 @@ function main_byrne()
         )
     plot!(
         p2,
-        range_t[1:10000],
-        raw_model_alt_signal_I[1:10000],
+        range_t[1:1000],
+        raw_model_alt_signal_I[1:1000],
         xlabel="Time (s)",
         title="Activity of Node 2",
         xticks=0:2000.0:10000.0,
@@ -858,6 +889,8 @@ function main_byrne()
         )
     plot(p1, p2, layout=(2,1))
     savefig("plots/diss/bc-oscill-alpha.png")
+
+
 
 end
 
@@ -879,20 +912,63 @@ end
 
 
 #p = [0.0167907, 1.84502, 8.10264, 4.90234, 3.76054, 0.0673752, 0.0, 0.275149, -2.27837]
-p = [0.0167907, 1.84502, 8.10264, 4.90234, 3.76054, 0.0673752, 0.27402, 0.275149, -2.27837]
-ps = [0.0162904, 0.434542, 6.39134, 6.7426, 5.9051, 0.264186, 0.27402, 0.933472, -5.18417]
-for i in 1:100
-    mkdir("data/model-inc-stim/"*string(i))
-    main_raf(ps, csv_path = "data/model-inc-stim/"*string(i))
-    println("Iteration: ", i)
-end
-for i in 1:100
-    mkdir("data/model-plus-stim/"*string(i))
-    main_raf(p, csv_path = "data/model-plus-stim/"*string(i))
-    println("Iteration: ", i)
-end
+#p = [0.0167907, 1.84502, 8.10264, 4.90234, 3.76054, 0.0673752, 0.27402, 0.275149, -2.27837]
+#ps = [0.0162904, 0.434542, 6.39134, 6.7426, 5.9051, 0.264186, 0.27402, 0.933472, -5.18417]
+#pln = [0.0167374, 0.769969, 0.36476, 8.44731, 5.90575, 0.0428938, 0.0, 1.34601, 0.524922]
+#=for i in 1:25
+    for j in 0:45:315
+        if j == 90
+            continue
+        end
+        mkdir("data/model-wc-plus-stim-resp-"*string(j)*"/"*string(i))
+        main_raf(p, j; csv_path = "data/model-wc-plus-stim-resp-"*string(j)*"/"*string(i))
+        println("Iteration: ", i, " Phase: ", j)
+    end
+end=#
 
-#main_raf(p)
+p = [0.016, 2.4, 2.0, 2.0, 4.0, 0.1, 0.0, 5.0, 0.0]
+main_raf(p,0; csv_path = "data/model-exp")
+
+#=max = []
+min = []
+for i in 0.0:0.0005:1.75
+    p = [0.0, 0.0, 0.0, i, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    x, n = main_byrne(p)
+    push!(max, x)
+    push!(min, n)
+    println("Iteration: ", i)
+end=#
+
+#=df_csv = CSV.read("bc-mm-2.csv", DataFrame)
+
+mx, N = denoise(df_csv[!, :max])
+mn, N = denoise(df_csv[!, :min])
+
+plot(
+        0.0:0.0005:(1.75-0.0005*3), 
+        [mx, mn],
+        legend=false,
+        xlabel="Synaptic Coupling (Kv)",
+        ylabel="V", 
+        c=3,
+        size=(500, 500),
+        xticks=0:0.5:2.0,
+        xlim=(0, 1.5),
+        linewidth=5,
+        xtickfont=12,
+        ytickfont=12,
+        titlefont=12,
+        guidefont=12,
+        tickfont=12,
+        margin=2.5mm
+        )
+    savefig("plots/diss/bc-oscill-1-bif.png")=#
+
+#params = [34.0491, 0.286157, -0.958979, 0.364366, 0.0278311, 2.49529, -0.111033, 2.45484, 0.371314, 0.0385027, 0.480408, 0.196578]
+#params = [34.2104, 1.78662, -1.70839, 0.977059, 0.00173827, 0.275055, -1.82158, 2.18014, 0.296708, 0.134904, 0.433616, 0.1]
+#main_byrne(params)
+#
+#main_raf([0.008, 2.4, 2.0, 2.0, 4.0, 0.0, 0.0, 0.5, 0.0], 0; csv_path = "data/model")
 #main_raf(ps, csv_path = "data/model-stim")
 #plot_data_model_features("data/P11/08_02_2024_P11_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v2")
 #plot_data_model_features("data/P20/15_02_2024_P20_Ch14_FRQ=10Hz_FULL_CL_phase=0_REST_EC_v1")
